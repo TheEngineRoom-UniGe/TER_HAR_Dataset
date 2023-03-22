@@ -92,12 +92,6 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 data = TensorDataset(x, y)
 loader = DataLoader(data, batch_size=batch_size, shuffle=True)
 
-2 / 2
-
-Sure! Here's an updated version of your training loop with early stopping added:
-
-python
-Copy code
 # Set up early stopping
 patience = 5
 min_delta = 0.001
