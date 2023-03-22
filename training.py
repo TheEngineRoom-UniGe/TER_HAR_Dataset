@@ -100,5 +100,6 @@ for epoch in range(epochs):
         running_loss += loss.item()
 
     # Print the loss every 10 epochs
-    # if epoch % 10 == 0:
+    if epoch % 10 == 0:
+        torch.save(model.state_dict(), "lstm_model.pth")
     print(f'Epoch {epoch}/{epochs} - Loss: {running_loss / len(loader):.4f}')
