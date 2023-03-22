@@ -89,57 +89,54 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 # Create a DataLoader for the input data and labels
-data = TensorDataset(x, y)
-loader = DataLoader(data, batch_size=batch_size, shuffle=True)
+x_train, y_train, x_val, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+data_train = TensorDataset(x_train, y_train)
+data_val = TensorDataset(x_val, y_val)
+train_loader = DataLoader(data_train, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(data_val, batch_size=batch_size, shuffle=True)
+
 
 # Set up early stopping
 patience = 5
-min_delta = 0.001
-best_loss = float('inf')
-best_model = None
-epochs_no_improve = 0
+best_val_loss = float('inf')
+counter = 0
 
-# Train the model
 for epoch in range(epochs):
-    running_loss = 0.0
-    for i, batch in enumerate(loader):
+    # At the beginning of each epoch, set your model to train mode
+    model.train()
+    
+    # Loop through your training data
+    for i, batch in enumerate(train_loader):
         # Unpack the batch
         batch_x, batch_y = batch
 
-        # Zero the gradients
+        # Reset the gradients to zero
         optimizer.zero_grad()
-
-        # Forward pass
+        
+        # Pass the input sequence through the model and get the predicted output
         output = model(batch_x)
+        
+        # Calculate the loss between the predicted output and the true output
         loss = criterion(output, batch_y)
-
-        # Backward pass and optimize
+        
+        # Backpropagate the loss through the network and update the model parameters
         loss.backward()
         optimizer.step()
 
-        # Update running loss and accuracy
-        running_loss += loss.item()
-        _, predicted = torch.max(output.data, 1)
-        total += batch_y.size(0)
-        correct += (predicted == batch_y).sum().item()
+    model.eval()
 
-    # Print the loss every 10 epochs
-       
-    accuracy = 100 * correct / total
-    print(f'Epoch {epoch}/{epochs} - Loss: {running_loss / len(loader):.4f} - Accuracy: {accuracy:.2f}%')
+    y_pred = model(x_val)
+    val_loss = criterion(y_pred, y_val)
+    print(f"Epoch {epoch}: Training Loss = {loss.item():.4f}, Validation Loss = {val_loss:.4f}")
 
-    # Check for early stopping
-    if running_loss < best_loss - min_delta:
-        best_loss = running_loss
-        best_model = model.state_dict()
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
         torch.save(best_model.state_dict(), "lstm_model.pth")
-        epochs_no_improve = 0
+        counter = 0
     else:
-        epochs_no_improve += 1
-        if epochs_no_improve == patience:
-            print("Early stopping!")
-            break
+        counter += 1
+    if counter == patience:
+        print(f"Stopping training after {epoch} epochs due to no improvement in validation loss.")
+        break
 
-# Load the best model
-if best_model is not None:
-    model.load_state_dict(best_model)
+    
