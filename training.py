@@ -91,7 +91,19 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 # Create a DataLoader for the input data and labels
 data = TensorDataset(x, y)
 loader = DataLoader(data, batch_size=batch_size, shuffle=True)
-validation_set = ...
+
+2 / 2
+
+Sure! Here's an updated version of your training loop with early stopping added:
+
+python
+Copy code
+# Set up early stopping
+patience = 5
+min_delta = 0.001
+best_loss = float('inf')
+best_model = None
+epochs_no_improve = 0
 
 # Train the model
 for epoch in range(epochs):
@@ -118,7 +130,22 @@ for epoch in range(epochs):
         correct += (predicted == batch_y).sum().item()
 
     # Print the loss every 10 epochs
-    if epoch % 10 == 0:
-        torch.save(model.state_dict(), "lstm_model.pth")
+       
     accuracy = 100 * correct / total
     print(f'Epoch {epoch}/{epochs} - Loss: {running_loss / len(loader):.4f} - Accuracy: {accuracy:.2f}%')
+
+    # Check for early stopping
+    if running_loss < best_loss - min_delta:
+        best_loss = running_loss
+        best_model = model.state_dict()
+        torch.save(best_model.state_dict(), "lstm_model.pth")
+        epochs_no_improve = 0
+    else:
+        epochs_no_improve += 1
+        if epochs_no_improve == patience:
+            print("Early stopping!")
+            break
+
+# Load the best model
+if best_model is not None:
+    model.load_state_dict(best_model)
