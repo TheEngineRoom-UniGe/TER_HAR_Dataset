@@ -31,12 +31,6 @@ print("Loaded dataset and labels: ")
 print(f'\t{dataset.shape=}')
 print(f'\t{integer_labels.shape=}')
 
-x = torch.Tensor(dataset)
-y = torch.Tensor(integer_labels).squeeze().long()
-print(f'\t{x.shape=}')
-print(f'\t{y.shape=}')
-
-
 # Split the data into training and test sets
 train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, labels, test_size=0.2, random_state=42)
 
@@ -50,6 +44,11 @@ print("\n--- Training ---")
 # Set device to CUDA if available, otherwise use CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'\nSetting torch device to: {device=}')
+
+x = torch.Tensor(dataset).to(device)
+y = torch.Tensor(integer_labels).squeeze().long().to(device)
+print(f'\t{x.shape=}')
+print(f'\t{y.shape=}')
 
 # Define hyperparameters
 input_dim = 24
