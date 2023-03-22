@@ -67,7 +67,7 @@ print(f'\t{epochs=}')
 print(f'\t{batch_size=}\n')
 
 # Instantiate the model
-model = LSTMMultiClass(input_dim, hidden_dim, output_dim)
+model = LSTMMultiClass(input_dim, hidden_dim, output_dim).to(device)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
