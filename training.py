@@ -21,7 +21,7 @@ class LSTMMultiClass(nn.Module):
         out = self.fc(out)
 
         # L2 regularization
-        l2_reg = torch.tensor(0.)
+        l2_reg = torch.tensor(0.).to(device)
         for name, param in self.named_parameters():
             if 'weight' in name:
                 l2_reg += torch.norm(param, p=2)
@@ -137,7 +137,7 @@ for epoch in range(epochs):
 
     if val_loss < best_val_loss:
         best_val_loss = val_loss
-        torch.save(best_model.state_dict(), "lstm_model.pth")
+        torch.save(model.state_dict(), "lstm_model.pth")
         counter = 0
     else:
         counter += 1
