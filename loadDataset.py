@@ -64,6 +64,15 @@ def dataResampling(dataset):
         dataset[i] = resample(dataset[i], current_stamps, min_stamps)
     return dataset
 
+def normalize(dataset):
+    acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
+    gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
+
+    # 1g equals 8192. The full range is 2g
+    dataset[:,:,acceleration_idxs] = dataset[:,:,acceleration_idxs] / 16384.0
+    dataset[:,:,gyroscope_idxs] = dataset[:,:,gyroscope_idxs] / 4000.0
+
+    return dataset
 
 
 def LowPass(sequence, freq):
@@ -250,6 +259,8 @@ labels_list = np.asarray(labels_list).reshape(-1, 1)
 
 print(f'{masked_list_np.shape=}')
 print(f'{labels_list.shape=}')
+
+masked_list_np = normalize(masked_list_np)
 
 filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
 np.save(filename, masked_list_np)
