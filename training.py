@@ -9,7 +9,7 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 
-training = False
+training = True
 
 
 def get_accuracy(pred, test):

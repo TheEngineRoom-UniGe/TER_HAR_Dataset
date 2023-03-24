@@ -25,22 +25,20 @@ def mergeIntoGeneralActions(labels, actions):
             action_dict[general_action_name].append(seq)
 
     action_list_np = []
-    len_list = []
     labels_list = []
 
     for key in action_dict.keys():
         print(key, '->', len(action_dict[key]), 'sequences')
-        len_list.append(len(action_dict[key]))
         for i in range(len(action_dict[key])):
             labels_list.append(key)
-            action_list_np.append(action_dict[key][i])
+            action_list_np.append(np.asarray(action_dict[key][i]))
 
     # print(f'{len_list=}')
     print(f'{len(labels_list)=}')
     print(f'{len(action_list_np)=}')  
 
     # exit()
-    return labels_list, action_list_np, len_list
+    return labels_list, action_list_np
 
 
 def zeroPadding(dataset):
@@ -250,18 +248,22 @@ for action, action_name in zip(action_list, action_names):
     print('---------------------------------------------')
 
 # action_list_np = np.asarray(action_list_np)
-len_list = np.asarray(len_list)
 
-# This gets the action list and removes the _left or _right from the action name merging into general actions
-labels_list, action_list_np, len_list = mergeIntoGeneralActions(labels_list, action_list_np)
+
   
-
+len_list = np.asarray(len_list)
+# labels_list = np.asarray(labels_list)
+# action_list_np = np.asarray(action_list_np)
 
 # Treshold to remove outliers with too many samples
 threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
 print(f'{threshold=}')
 mask_np = len_list < threshold
+print(f'{np.count_nonzero(mask_np)=}')
 
+# mask_np1 = len_list < 100.0
+# print(f'{np.count_nonzero(mask_np1)=}')
+# exit()
 # Plotting the histogram of the lengths of the sequences
 font1 = font={
                 'family' : 'Times New Roman',
@@ -281,13 +283,15 @@ masked_list = list(compress(action_list_np, mask_np))
 labels_list = list(compress(labels_list, mask_np))
 print(len(masked_list))
 print(len(masked_list)/len(action_list_np))
-print(len(masked_list[0]))
-print(len(action_list_np[0]))
+print(len(action_list_np))
 
 masked_len_list = list(compress(len_list, mask_np))
 fig = px.histogram(masked_len_list, nbins=200)
 # fig.show()
 # exit()
+
+# This gets the action list and removes the '_left' or '_right' from the action name merging into general actions
+labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
 
 tensor_list = [torch.tensor(arr) for arr in masked_list]
 tensor = pad_sequence(tensor_list, batch_first=True)
@@ -306,8 +310,8 @@ masked_list_np = normalize(masked_list_np)
 filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
 np.save(filename, masked_list_np)
 
-filename = "data_shape({}_{}_{}).pt".format(*masked_list_np.shape)
-torch.save(tensor, filename)
+# filename = "data_shape({}_{}_{}).pt".format(*masked_list_np.shape)
+# torch.save(tensor, filename)
 
 filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
 np.save(filename, labels_list)
