@@ -4,8 +4,12 @@ from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, Dataset  # For data loading and batching
-import torch.nn.functional as F
-training = True
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
+import matplotlib.pyplot as plt
+
+training = False
 
 
 def get_accuracy(pred, test):
@@ -39,7 +43,7 @@ class LSTMMultiClass(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout_prob=0.5):
         super(LSTMMultiClass, self).__init__()
         self.hidden_dim = hidden_dim
-        self.lstm = nn.LSTM(input_dim, hidden_dim, dropout=dropout_prob, num_layers=n_layers, batch_first=True)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=n_layers, batch_first=True)
         self.fc1 = nn.Linear(hidden_dim, 128)
         self.dropout = nn.Dropout(dropout_prob)
         self.fc2 = nn.Linear(128, output_dim)
@@ -55,9 +59,10 @@ class LSTMMultiClass(nn.Module):
 
 print("\n--- Data Loading ---")
 
-dataset = np.load('data_shape(1208_3540_24).npy')
+dataset = np.load('data_shape(2699_2981_24).npy').astype('float64')
 # dataset = torch.load('filename')
-labels = np.load('labels_shape(1208_1).npy')
+labels = np.load('labels_shape(2699_1).npy')
+unique_labels = np.unique(labels)
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
@@ -80,7 +85,8 @@ print(f'\t{test_labels.shape=}')
 
 print("\n--- Training ---")
 # Set device to CUDA if available, otherwise use CPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 print(f'\nSetting torch device to: {device=}')
 
 x = torch.Tensor(train_dataset).to(device)
@@ -96,11 +102,11 @@ input_dim = 24
 hidden_dim = 256
 n_layers = 1
 output_dim = y.unique().shape[0]
-lr = 0.001
-epochs = 500
+lr = 0.0005
+epochs = 200
 batch_size = 16
 dropout = 0.2
-l2_lambda = 0.0005
+l2_lambda = 0.0001
 
 print(f'\nHyperparameters: ')
 print(f'\t{input_dim=}')
@@ -111,7 +117,7 @@ print(f'\t{epochs=}')
 print(f'\t{batch_size=}\n')
 
 # Instantiate the model
-model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).to(device)
+model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
 print(f'{model=}')
 
 # Define the loss function and optimizer
@@ -127,10 +133,11 @@ print(f'{y_train.shape=}')
 print(f'{x_val.shape=}')
 print(f'{y_val.shape=}')
 data_train = TensorDataset(x_train, y_train)
-data_val = TensorDataset(x_val, y_val)
+# data_val = TensorDataset(x_val, y_val)
 train_loader = DataLoader(data_train, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(data_val, batch_size=batch_size, shuffle=True)
-
+# val_loader = DataLoader(data_val, batch_size=batch_size, shuffle=True)
+x_val = x_val.cuda()
+y_val = y_val.cuda()
 
 # Set up early stopping
 patience = 50
@@ -146,7 +153,9 @@ if training:
         for i, batch in enumerate(train_loader):
             # Unpack the batch
             batch_x, batch_y = batch
-
+            batch_x=batch_x.cuda()
+            batch_y=batch_y.cuda()
+            # print(f'{batch_x.device=}')
             # Reset the gradients to zero
             optimizer.zero_grad()
             
@@ -180,7 +189,17 @@ if training:
 
 model.load_state_dict(torch.load("lstm_model.pth"))
 model.eval()
+x_test = x_test.cuda()
 y_pred = model(x_test)  
 
 acc = get_accuracy(y_pred, y_test)
 print("accuracy: ", acc)
+
+
+# Build confusion matrix
+cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
+df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index = [i for i in unique_labels],
+                     columns = [i for i in unique_labels])
+plt.figure(figsize = (12,7))
+sn.heatmap(df_cm, annot=True)
+plt.savefig('output.png')

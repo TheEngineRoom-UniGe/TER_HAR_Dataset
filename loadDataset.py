@@ -10,6 +10,35 @@ from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
 
+def mergeIntoGeneralActions(labels, actions):
+    action_dict = {}
+    for seq, action_name in zip(actions, labels):
+        print(seq.shape, action_name)
+        general_action_name = action_name.split('_')[0]
+        if general_action_name not in action_dict.keys():
+            action_dict[general_action_name] = [seq]
+        else:
+            action_dict[general_action_name].append(seq)
+
+    action_list_np = []
+    len_list = []
+    labels_list = []
+
+    for key in action_dict.keys():
+        print(key, '->', len(action_dict[key]), 'sequences')
+        len_list.append(len(action_dict[key]))
+        for i in range(len(action_dict[key])):
+            labels_list.append(key)
+            action_list_np.append(action_dict[key][i])
+
+    print(f'{len_list=}')
+    print(f'{len(labels_list)=}')
+    print(f'{len(action_list_np)=}')  
+
+    exit()
+    return labels_list, action_list_np, len_list
+
+
 def zeroPadding(dataset):
     maxl = 0
     for sequence in dataset:
@@ -219,15 +248,17 @@ for action, action_name in zip(action_list, action_names):
 # action_list_np = np.asarray(action_list_np)
 len_list = np.asarray(len_list)
 
+# This gets the action list and removes the _left or _right from the action name merging into general actions
+labels_list, action_list_np, len_list = mergeIntoGeneralActions(labels_list, action_list_np)
+  
 
-# threshold = np.sort(len_list)[-5]
-# print(f'{threshold=}')
+
+# Treshold to remove outliers with too many samples
 threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
 print(f'{threshold=}')
-# len_list = [item for item in len_list if (item < threshold)]
 mask_np = len_list < threshold
-# print(f'{len_list[:50]=}')
-# print(f'{mask_np[:50]=}')
+
+# Plotting the histogram of the lengths of the sequences
 font1 = font={
                 'family' : 'Times New Roman',
                 'size' : 18
@@ -237,11 +268,10 @@ fig.add_vline(x=np.mean(len_list), annotation_text='  <b>Mean', annotation_posit
 fig.add_vline(x=np.median(len_list), annotation_text='<b>Median  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="red", col=1, row=1)
 fig.add_vline(x=np.mean(len_list)+2*np.std(len_list), annotation_text='<b>mean+2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
 fig.add_vline(x=np.mean(len_list)-2*np.std(len_list), annotation_text='<b>mean-2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
-fig.show()
+# fig.show()
 
 
-# print(len_list)
-# print(mask)
+# Apply the mask to the action list to remove the outliers
 print(len(action_list_np))
 masked_list = list(compress(action_list_np, mask_np))
 labels_list = list(compress(labels_list, mask_np))
@@ -266,6 +296,8 @@ print(f'{masked_list_np.shape=}')
 print(f'{labels_list.shape=}')
 
 masked_list_np = normalize(masked_list_np)
+
+# Save stuff
 
 filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
 np.save(filename, masked_list_np)
