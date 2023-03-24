@@ -5,7 +5,8 @@ from matplotlib import pyplot as plt
 from scipy import interpolate
 import plotly.express as px
 from itertools import compress
-# import keras
+import torch
+from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
 
@@ -70,7 +71,7 @@ def normalize(dataset):
 
     # 1g equals 8192. The full range is 2g
     dataset[:,:,acceleration_idxs] = dataset[:,:,acceleration_idxs] / 16384.0
-    dataset[:,:,gyroscope_idxs] = dataset[:,:,gyroscope_idxs] / 4000.0
+    dataset[:,:,gyroscope_idxs] = dataset[:,:,gyroscope_idxs] / 2000.0
 
     return dataset
 
@@ -201,7 +202,7 @@ len_list = []
 labels_list = []
 
 for action, action_name in zip(action_list, action_names):
-    if len(action) < 7:
+    if len(action) < 12:
         print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
         print('---------------------------------------------')
         continue
@@ -221,22 +222,22 @@ len_list = np.asarray(len_list)
 
 # threshold = np.sort(len_list)[-5]
 # print(f'{threshold=}')
-threshold = np.mean(len_list)+2*np.std(len_list)
+threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
 print(f'{threshold=}')
 # len_list = [item for item in len_list if (item < threshold)]
 mask_np = len_list < threshold
 # print(f'{len_list[:50]=}')
 # print(f'{mask_np[:50]=}')
 font1 = font={
-                    'family' : 'Times New Roman',
-                    'size' : 18
-                    }
-fig = px.histogram(len_list, nbins=200)
+                'family' : 'Times New Roman',
+                'size' : 18
+                }
+fig = px.histogram(len_list, nbins=400)
 fig.add_vline(x=np.mean(len_list), annotation_text='  <b>Mean', annotation_position='right', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="black", col=1, row=1)
 fig.add_vline(x=np.median(len_list), annotation_text='<b>Median  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="red", col=1, row=1)
 fig.add_vline(x=np.mean(len_list)+2*np.std(len_list), annotation_text='<b>mean+2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
 fig.add_vline(x=np.mean(len_list)-2*np.std(len_list), annotation_text='<b>mean-2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
-# fig.show()
+fig.show()
 
 
 # print(len_list)
@@ -253,6 +254,10 @@ masked_len_list = list(compress(len_list, mask_np))
 fig = px.histogram(masked_len_list, nbins=200)
 # fig.show()
 # exit()
+
+tensor_list = [torch.tensor(arr) for arr in masked_list]
+tensor = pad_sequence(tensor_list, batch_first=True)
+
 '''APPLY ZERO PADDING TO HAVE SEQUENCES OF THE SAME SIZES'''
 masked_list_np = zeroPadding(masked_list)
 labels_list = np.asarray(labels_list).reshape(-1, 1)
@@ -265,10 +270,14 @@ masked_list_np = normalize(masked_list_np)
 filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
 np.save(filename, masked_list_np)
 
+filename = "data_shape({}_{}_{}).pt".format(*masked_list_np.shape)
+torch.save(tensor, filename)
+
 filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
 np.save(filename, labels_list)
+print("Unique Labels:", np.unique(labels_list).shape[0])
 
-
+print(f'{tensor.shape=}')
 
 # np_action_list = np.array([v for v in action_dict.values()])
 # print(np_action_list.shape)

@@ -3,9 +3,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset  # For data loading and batching
+from torch.utils.data import DataLoader, TensorDataset, Dataset  # For data loading and batching
 import torch.nn.functional as F
-
 training = True
 
 
@@ -20,14 +19,30 @@ def get_accuracy(pred, test):
     return (correct/test.shape[0])*100
 
 
+# class CustomDataset(Dataset):
+#     def __init__(self, data, targets):
+#         self.data = data
+#         self.targets = targets
+#         self.smote = SMOTE()
+
+#         def __len__(self):
+#             return len(self.data)
+        
+#         def __getitem__(self):
+#             x = self.data[idx]
+#             y = self.targets[idx]
+
+            
+
+
 class LSTMMultiClass(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout_prob=0.5):
         super(LSTMMultiClass, self).__init__()
         self.hidden_dim = hidden_dim
         self.lstm = nn.LSTM(input_dim, hidden_dim, dropout=dropout_prob, num_layers=n_layers, batch_first=True)
-        self.fc1 = nn.Linear(hidden_dim, 64)
+        self.fc1 = nn.Linear(hidden_dim, 128)
         self.dropout = nn.Dropout(dropout_prob)
-        self.fc2 = nn.Linear(64, output_dim)
+        self.fc2 = nn.Linear(128, output_dim)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
@@ -40,8 +55,9 @@ class LSTMMultiClass(nn.Module):
 
 print("\n--- Data Loading ---")
 
-dataset = np.load('data_shape(1264_5628_24).npy')
-labels = np.load('labels_shape(1264_1).npy')
+dataset = np.load('data_shape(1208_3540_24).npy')
+# dataset = torch.load('filename')
+labels = np.load('labels_shape(1208_1).npy')
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
@@ -50,6 +66,8 @@ integer_labels = label_encoder.fit_transform(labels.ravel())
 print("Loaded dataset and labels: ")
 print(f'\t{dataset.shape=}')
 print(f'\t{integer_labels.shape=}')
+print("Most populated class: ", np.argmax(np.bincount(integer_labels)))
+
 
 # Split the data into training and test sets
 train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
@@ -75,14 +93,14 @@ print(f'\t{y.shape=}')
 
 # Define hyperparameters
 input_dim = 24
-hidden_dim = 128
+hidden_dim = 256
 n_layers = 1
 output_dim = y.unique().shape[0]
 lr = 0.001
-epochs = 200
+epochs = 500
 batch_size = 16
 dropout = 0.2
-l2_lambda = 0.00005
+l2_lambda = 0.0005
 
 print(f'\nHyperparameters: ')
 print(f'\t{input_dim=}')
@@ -115,7 +133,7 @@ val_loader = DataLoader(data_val, batch_size=batch_size, shuffle=True)
 
 
 # Set up early stopping
-patience = 10
+patience = 50
 best_val_loss = float('inf')
 counter = 0
 
