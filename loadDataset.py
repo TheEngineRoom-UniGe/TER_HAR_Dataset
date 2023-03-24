@@ -15,6 +15,10 @@ def mergeIntoGeneralActions(labels, actions):
     for seq, action_name in zip(actions, labels):
         # print(seq.shape, action_name)
         general_action_name = action_name.split('_')[0]
+        if "ASSEMBLY" in general_action_name:
+            general_action_name = "ASSEMBLY"
+        if "HANDOVER" in general_action_name:
+            general_action_name = "HANDOVER"
         if general_action_name not in action_dict.keys():
             action_dict[general_action_name] = [seq]
         else:
@@ -35,7 +39,7 @@ def mergeIntoGeneralActions(labels, actions):
     print(f'{len(labels_list)=}')
     print(f'{len(action_list_np)=}')  
 
-    exit()
+    # exit()
     return labels_list, action_list_np, len_list
 
 
