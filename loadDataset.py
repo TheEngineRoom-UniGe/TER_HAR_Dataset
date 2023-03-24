@@ -13,7 +13,7 @@ IMU_FREQ = 25 #HZ
 def mergeIntoGeneralActions(labels, actions):
     action_dict = {}
     for seq, action_name in zip(actions, labels):
-        print(seq.shape, action_name)
+        # print(seq.shape, action_name)
         general_action_name = action_name.split('_')[0]
         if general_action_name not in action_dict.keys():
             action_dict[general_action_name] = [seq]
@@ -31,7 +31,7 @@ def mergeIntoGeneralActions(labels, actions):
             labels_list.append(key)
             action_list_np.append(action_dict[key][i])
 
-    print(f'{len_list=}')
+    # print(f'{len_list=}')
     print(f'{len(labels_list)=}')
     print(f'{len(action_list_np)=}')  
 
