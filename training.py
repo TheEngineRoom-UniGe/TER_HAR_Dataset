@@ -9,7 +9,15 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 
-training = True
+from models import LSTMMultiClass, TransformerClassifier
+
+training = False
+
+def ignore_features(dataset):
+    mask = np.ones((24), dtype=bool)
+    mask[[3,4,5,9,10,11,15,16,17,21,22,23]] = False
+    dataset = dataset[:, :, mask]
+    return dataset
 
 
 def get_accuracy(pred, test):
@@ -22,54 +30,33 @@ def get_accuracy(pred, test):
             wrong+=1
     return (correct/test.shape[0])*100
 
-
-# class CustomDataset(Dataset):
-#     def __init__(self, data, targets):
-#         self.data = data
-#         self.targets = targets
-#         self.smote = SMOTE()
-
-#         def __len__(self):
-#             return len(self.data)
-        
-#         def __getitem__(self):
-#             x = self.data[idx]
-#             y = self.targets[idx]
-
-            
+def normalize(data):
+    maxes = np.amax(data, axis=(0,1))
+    return data/maxes
 
 
-class LSTMMultiClass(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout_prob=0.5):
-        super(LSTMMultiClass, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=n_layers, batch_first=True)
-        self.fc1 = nn.Linear(hidden_dim, 128)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.fc2 = nn.Linear(128, output_dim)
-        self.sm = nn.Softmax(dim=1)
+def add_feature_profiles(dataset):
+    dataset = dataset.reshape(dataset.shape[0], dataset.shape[1], -1, 3)
+    module = np.sqrt(np.sum(dataset**2, axis=3))
+    dataset = np.concatenate((dataset, module[..., None]), axis=3)
+    return dataset.reshape(dataset.shape[0], dataset.shape[1], -1)
 
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        # out = self.dropout(lstm_out[:, -1, :])
-        out = self.fc1(lstm_out[:, -1, :])
-        out = self.dropout(out)
-        out = self.fc2(out)
-        out = self.sm(out)
-        return out
 
 
 print("\n--- Data Loading ---")
 
-dataset = np.load('data_shape(2699_2981_24).npy').astype('float64')
+dataset = np.load('data_shape(2706_2977_24).npy').astype('float32')
 # dataset = torch.load('filename')
-labels = np.load('labels_shape(2699_1).npy')
+labels = np.load('labels_shape(2706_1).npy')
 unique_labels = np.unique(labels)
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
 integer_labels = label_encoder.fit_transform(labels.ravel())
 
+dataset = ignore_features(dataset)
+dataset = add_feature_profiles(dataset)
+dataset = dataset[:,:,12:16]
 print("Loaded dataset and labels: ")
 print(f'\t{dataset.shape=}')
 print(f'\t{integer_labels.shape=}')
@@ -78,6 +65,9 @@ print("Most populated class: ", np.argmax(np.bincount(integer_labels)))
 
 # Split the data into training and test sets
 train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
+
+# train_dataset = normalize(train_dataset)
+# test_dataset = normalize(test_dataset)  
 
 print("\nSplitted dataset and labels: ")
 print(f'\t{train_dataset.shape=}')
@@ -100,15 +90,17 @@ print(f'\t{x.shape=}')
 print(f'\t{y.shape=}')
 
 # Define hyperparameters
-input_dim = 24
-hidden_dim = 256
-n_layers = 1
+input_dim = dataset[0].shape[-1]
+hidden_dim = 128
+n_layers = 2
 output_dim = y.unique().shape[0]
 lr = 0.0005
 epochs = 200
 batch_size = 16
-dropout = 0.2
+dropout = 0.1
 l2_lambda = 0.0001
+
+nheads = 4
 
 print(f'\nHyperparameters: ')
 print(f'\t{input_dim=}')
@@ -120,6 +112,7 @@ print(f'\t{batch_size=}\n')
 
 # Instantiate the model
 model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
+# model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 print(f'{model=}')
 
 # Define the loss function and optimizer
@@ -200,7 +193,10 @@ print("accuracy: ", acc)
 
 # Build confusion matrix
 cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
-df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index = [i for i in unique_labels],
+print(cf_matrix)
+print(np.sum(cf_matrix, axis=1)[:, None])
+cf_matrix = cf_matrix / np.sum(cf_matrix, axis=1)[:, None]
+df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
                      columns = [i for i in unique_labels])
 plt.figure(figsize = (12,7))
 sn.heatmap(df_cm, annot=True)

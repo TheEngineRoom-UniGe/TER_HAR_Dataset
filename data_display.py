@@ -5,12 +5,18 @@ import torch
 # assume data is a numpy array of shape (1264, 5628, 24)
 # with (n_sequences, seq_len, features)
 
+def normalize(data):
+    maxes = np.amax(data, axis=(0,1))
+    # print(maxes)
+    return data/maxes
+
 n_plots = 8
 features_per_plot = 3
 
-dataset = np.load('data_shape(1208_3540_24).npy')
+dataset = np.load('data_shape(2699_2981_24).npy')
+dataset = normalize(dataset)
 # dataset = torch.load('filename')
-labels = np.load('labels_shape(1208_1).npy')
+labels = np.load('labels_shape(2699_1).npy')
 
 for seq_idx in range(dataset.shape[0]):
 

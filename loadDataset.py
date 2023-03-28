@@ -10,6 +10,86 @@ from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
 
+def remap_categories(labels, dataset):
+    action_dict = {}
+    for sequence, label in zip (dataset, labels):
+        # print(label)
+        base_action = label.split('_')[0]
+        hand = label.split('_')[1]
+
+        if 'FAILED' in label:
+            continue
+
+        if 'ASSEMBLY' in base_action:
+            base_action = 'ASSEMBLY'
+        
+        if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
+            base_action = 'PICKUP'
+
+        if 'BOLT' in base_action:
+            base_action = 'SCREW'
+
+        # if 'ASSEMBLY1' in base_action:
+        #     action_dict['ASSEMBLY1'] = [sequence[:,:3]]
+        # if 'ASSEMBLY2' in base_action:
+        #     if
+        #     action_dict['ASSEMBLY2'] = 1
+
+        add_seq = []
+
+        # if 'ASSEMBLY' in base_action:
+        #     continue
+
+        # if 'SCREW' in base_action:
+        #     if 'RIGHT' in hand:
+        #         add_seq = [sequence[:,12:24]]
+        #     if 'LEFT' in hand:
+        #         add_seq = [sequence[:,0:12]]
+        #     if 'BIMANUAL' in hand:
+        #         add_seq = [sequence[:,0:12], sequence[:,12:24]]
+
+        # if 'BOLT' in base_action:
+        #     if 'RIGHT' in hand:
+        #         add_seq = [sequence[:,12:24]]
+        #     if 'LEFT' in hand:
+        #         add_seq = [sequence[:,0:12]]
+
+        # if 'DELIVERY' in base_action or 'PICKUP' in base_action or 'HANDOVER' in base_action:
+        #     if 'RIGHT' in hand:
+        #         add_seq = [sequence[:,12:24]]
+        #     if 'LEFT' in hand:
+        #         add_seq = [sequence[:,0:12]]
+        #     if 'BIMANUAL' in hand:
+        #         add_seq = [sequence[:,0:12], sequence[:,12:24]]
+
+        # if 'IDLE' in base_action:
+        #     add_seq = [sequence[:,:12], sequence[:,12:24]]
+
+        add_seq = [sequence]
+
+        if base_action not in action_dict.keys():
+            action_dict[base_action] = add_seq
+        else:
+            for seq in add_seq:
+                action_dict[base_action].append(seq)
+
+    action_list_np = []
+    labels_list = []
+
+    for key in action_dict.keys():
+        print(key, '->', len(action_dict[key]), 'sequences')
+        for i in range(len(action_dict[key])):
+            labels_list.append(key)
+            action_list_np.append(np.asarray(action_dict[key][i]))
+
+    # print(f'{len_list=}')
+    print(f'{len(labels_list)=}')
+    print(f'{len(action_list_np)=}')  
+
+    # exit()
+    return labels_list, action_list_np
+    
+
 def mergeIntoGeneralActions(labels, actions):
     action_dict = {}
     for seq, action_name in zip(actions, labels):
@@ -17,8 +97,8 @@ def mergeIntoGeneralActions(labels, actions):
         general_action_name = action_name.split('_')[0]
         # if "ASSEMBLY" in general_action_name:
         #     general_action_name = "ASSEMBLY"
-        # if "HANDOVER" in general_action_name:
-        #     general_action_name = "DELIVERY"
+        if "HANDOVER" in general_action_name:
+            general_action_name = "DELIVERY"
         if general_action_name not in action_dict.keys():
             action_dict[general_action_name] = [seq]
         else:
@@ -42,13 +122,15 @@ def mergeIntoGeneralActions(labels, actions):
 
 
 def zeroPadding(dataset):
+    n_features = dataset[0].shape[-1]
+    print(f'{n_features=}')
     maxl = 0
     for sequence in dataset:
         if sequence.shape[0] >= maxl:
             maxl = sequence.shape[0]
 
-    padded_dataset = np.zeros((len(dataset), maxl, 24), dtype='float64')
-
+    padded_dataset = np.zeros((len(dataset), maxl, n_features), dtype='float32')
+    print(f'{padded_dataset.shape=}')
     for i, seq in enumerate(dataset):
         padded_dataset[i, -len(seq):] = seq
 
@@ -237,6 +319,9 @@ for action, action_name in zip(action_list, action_names):
         print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
         print('---------------------------------------------')
         continue
+    if action_name == 'IDLE':
+        print('IDLEEEEEE')
+        continue
     print(action_name, " -> ", len(action))
     for seq_list in action:
         # print('\t', len(seq_list))
@@ -291,19 +376,20 @@ fig = px.histogram(masked_len_list, nbins=200)
 # exit()
 
 # This gets the action list and removes the '_left' or '_right' from the action name merging into general actions
-labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
+# labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
+# labels_list, action_list_np = remap_categories(labels_list, masked_list)
 
 tensor_list = [torch.tensor(arr) for arr in masked_list]
 tensor = pad_sequence(tensor_list, batch_first=True)
 
 '''APPLY ZERO PADDING TO HAVE SEQUENCES OF THE SAME SIZES'''
-masked_list_np = zeroPadding(masked_list)
+masked_list_np = zeroPadding(action_list_np)
 labels_list = np.asarray(labels_list).reshape(-1, 1)
 
 print(f'{masked_list_np.shape=}')
 print(f'{labels_list.shape=}')
 
-masked_list_np = normalize(masked_list_np)
+# masked_list_np = normalize(masked_list_np)
 
 # Save stuff
 
