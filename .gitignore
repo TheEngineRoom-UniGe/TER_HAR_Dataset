@@ -4,3 +4,5 @@
 *.png
 *.pyc
 dataset/
+output.png
+lstm_model.pth
