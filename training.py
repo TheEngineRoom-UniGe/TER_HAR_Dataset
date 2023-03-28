@@ -47,6 +47,7 @@ class LSTMMultiClass(nn.Module):
         self.fc1 = nn.Linear(hidden_dim, 128)
         self.dropout = nn.Dropout(dropout_prob)
         self.fc2 = nn.Linear(128, output_dim)
+        self.sm = nn.Softmax(dim=1)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
@@ -54,6 +55,7 @@ class LSTMMultiClass(nn.Module):
         out = self.fc1(lstm_out[:, -1, :])
         out = self.dropout(out)
         out = self.fc2(out)
+        out = self.sm(out)
         return out
 
 
