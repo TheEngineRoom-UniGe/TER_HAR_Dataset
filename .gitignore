@@ -1,4 +1,5 @@
 *.npy
 *.pth
 *.pt
+*.png
 dataset/
