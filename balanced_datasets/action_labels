@@ -1,0 +1,5 @@
+BOLT ----> 0
+ASSEMBLY ----> 1
+PICKUP ----> 2
+SCREW ----> 3
+IDLE ----> 4

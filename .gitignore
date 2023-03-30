@@ -6,3 +6,5 @@
 dataset/
 output.png
 lstm_model.pth
+lstm_model.pth
+.gitignore

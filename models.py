@@ -12,13 +12,37 @@ class LSTMMultiClass(nn.Module):
         self.fc2 = nn.Linear(128, output_dim)
         self.sm = nn.Softmax(dim=1)
 
+
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         # out = self.dropout(lstm_out[:, -1, :])
         out = self.fc1(lstm_out[:, -1, :])
-        out = self.relu(out)
+        # out = self.relu(out)
         out = self.fc2(out)
         out = self.sm(out)
+        return out
+
+
+class LSTMBinary(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout_prob=0.5):
+        super(LSTMBinary, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=n_layers, dropout=dropout_prob, batch_first=True)
+        # self.fc1 = nn.Linear(hidden_dim, 128)
+
+        self.dropout = nn.Dropout(dropout_prob)
+        self.fc = nn.Linear(128, output_dim)
+        # self.sm = nn.Softmax(dim=1)
+        self.sig = nn.Sigmoid()
+        # self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        lstm_out, _ = self.lstm(x)
+        # out = self.dropout(lstm_out[:, -1, :])
+        out = self.dropout(lstm_out[:, -1, :])
+        # out = self.relu(out)
+        out = self.fc(out)
+        out = self.sig(out)
         return out
 
 

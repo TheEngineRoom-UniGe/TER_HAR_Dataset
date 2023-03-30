@@ -8,19 +8,37 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
+from torcheval.metrics import BinaryAccuracy
 
-from models import LSTMMultiClass, TransformerClassifier
+from models import LSTMMultiClass, TransformerClassifier, LSTMBinary
 
 training = False
 
+binary_classification = False
+
+current_action = 'ASSEMBLY1'
+
+def oneVsAll(labels, int_labels, label):
+    '''Converts a multi-class problem into a binary problem by setting all labels'''
+    unique_labels = np.unique(labels)
+    print(unique_labels)
+    int_label = np.argwhere(unique_labels == label)[0][0]
+    mask = int_labels == int_label
+    int_labels[mask] = 0
+    int_labels[~mask] = 1
+    return int_labels
+
 def ignore_features(dataset):
+    '''Excludes gyroscope data from the dataset'''
     mask = np.ones((24), dtype=bool)
     mask[[3,4,5,9,10,11,15,16,17,21,22,23]] = False
     dataset = dataset[:, :, mask]
     return dataset
 
 
+
 def get_accuracy(pred, test):
+    '''Returns the accuracy of the model on the multiclass problem'''
     correct = 0
     wrong = 0
     for p, t in zip(torch.argmax(pred,1), test):
@@ -31,11 +49,13 @@ def get_accuracy(pred, test):
     return (correct/test.shape[0])*100
 
 def normalize(data):
+    '''Normalizes the data by dividing each feature by its maximum value'''
     maxes = np.amax(data, axis=(0,1))
     return data/maxes
 
 
 def add_feature_profiles(dataset):
+    '''Adds the module of the 3D vector of each feature to the dataset'''
     dataset = dataset.reshape(dataset.shape[0], dataset.shape[1], -1, 3)
     module = np.sqrt(np.sum(dataset**2, axis=3))
     dataset = np.concatenate((dataset, module[..., None]), axis=3)
@@ -45,18 +65,25 @@ def add_feature_profiles(dataset):
 
 print("\n--- Data Loading ---")
 
-dataset = np.load('data_shape(2706_2977_24).npy').astype('float32')
+dataset = np.load('balanced_datasets/balanced_data.npy').astype('float32')
 # dataset = torch.load('filename')
-labels = np.load('labels_shape(2706_1).npy')
-unique_labels = np.unique(labels)
+labels = np.load('balanced_datasets/balanced_labels.npy').astype('int32')
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
 integer_labels = label_encoder.fit_transform(labels.ravel())
+integer_labels = labels.ravel()
+
+
+if binary_classification:
+    print("\n--- Reducing to a Binary Classification Problem ---")
+    integer_labels = oneVsAll(labels, integer_labels, current_action)
+unique_labels = np.unique(integer_labels)
 
 dataset = ignore_features(dataset)
 dataset = add_feature_profiles(dataset)
-dataset = dataset[:,:,12:16]
+# dataset = dataset[:,:,12:16]
+
 print("Loaded dataset and labels: ")
 print(f'\t{dataset.shape=}')
 print(f'\t{integer_labels.shape=}')
@@ -93,14 +120,22 @@ print(f'\t{y.shape=}')
 input_dim = dataset[0].shape[-1]
 hidden_dim = 128
 n_layers = 2
-output_dim = y.unique().shape[0]
-lr = 0.0005
+if binary_classification:
+    output_dim = 1
+else:
+    output_dim = y.unique().shape[0]  
+lr = 0.0001
 epochs = 200
 batch_size = 16
-dropout = 0.1
+dropout = 0.5
 l2_lambda = 0.0001
 
 nheads = 4
+
+# Set up early stopping
+patience = 8
+best_val_loss = float('inf')
+counter = 0
 
 print(f'\nHyperparameters: ')
 print(f'\t{input_dim=}')
@@ -109,14 +144,22 @@ print(f'\t{output_dim=}')
 print(f'\t{lr=}')
 print(f'\t{epochs=}')
 print(f'\t{batch_size=}\n')
+print(f'\t{l2_lambda=}\n')
+print(f'\t{patience=}\n')
 
 # Instantiate the model
-model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
+if binary_classification:
+    model = LSTMBinary(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
+else:
+    model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
 # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
-print(f'{model=}')
+print(f'{model}')
 
 # Define the loss function and optimizer
-criterion = nn.CrossEntropyLoss()
+if binary_classification:
+    criterion= nn.BCELoss()
+else:
+    criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2_lambda)
 
 # Create a DataLoader for the input data and labels
@@ -134,10 +177,9 @@ train_loader = DataLoader(data_train, batch_size=batch_size, shuffle=True)
 x_val = x_val.cuda()
 y_val = y_val.cuda()
 
-# Set up early stopping
-patience = 50
-best_val_loss = float('inf')
-counter = 0
+metric = BinaryAccuracy(device=torch.device('cuda'))
+
+
 
 if training:
     for epoch in range(epochs):
@@ -158,22 +200,39 @@ if training:
             output = model(batch_x)
             
             # Calculate the loss between the predicted output and the true output
-            loss = criterion(output, batch_y)
-            
+
+            if binary_classification:
+                loss = criterion(output.squeeze(), batch_y.float())
+            else:
+                loss = criterion(output, batch_y)
             # Backpropagate the loss through the network and update the model parameters
             loss.backward()
             optimizer.step()
 
+            del batch_x
+            del batch_y
+            del output
+
         model.eval()
 
         y_pred = model(x_val)
-        val_loss = criterion(y_pred, y_val)
-        acc = get_accuracy(y_pred, y_val)
+        
+        if binary_classification:
+            val_loss = criterion(y_pred.squeeze(), y_val.float())
+            metric.update(y_pred.squeeze(), y_val)
+            acc = metric.compute()
+        else:
+            val_loss = criterion(y_pred, y_val)
+            acc = get_accuracy(y_pred, y_val)
+
         print(f"Epoch {epoch}: Training Loss = {loss.item():.4f}, Validation Loss = {val_loss:.4f}, Validation Accuracy = {acc:.2f}")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), "lstm_model.pth")
+            if binary_classification:
+                torch.save(model.state_dict(), f"binary_models/{current_action}.pth")
+            else:
+                torch.save(model.state_dict(), "lstm_model.pth")
             counter = 0
         else:
             counter += 1
@@ -181,18 +240,29 @@ if training:
             print(f"Stopping training after {epoch} epochs due to no improvement in validation loss.")
             break
 
-
-model.load_state_dict(torch.load("lstm_model.pth"))
+if binary_classification:
+    model.load_state_dict(torch.load(f"binary_models/{current_action}.pth"))
+else:
+    model.load_state_dict(torch.load("lstm_model.pth"))
 model.eval()
 x_test = x_test.cuda()
 y_pred = model(x_test)  
-
-acc = get_accuracy(y_pred, y_test)
+if binary_classification:
+    metric = BinaryAccuracy(device=torch.device('cuda'))
+    metric.update(y_pred.squeeze().cuda(), y_test.cuda())
+    acc = metric.compute()
+else:
+    acc = get_accuracy(y_pred, y_test)
 print("accuracy: ", acc)
 
 
 # Build confusion matrix
-cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
+if binary_classification:
+    y_pred = y_pred>0.5
+    y_pred = y_pred.cpu()
+    cf_matrix = confusion_matrix(y_pred, y_test.cpu())
+else:
+    cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
 print(cf_matrix)
 print(np.sum(cf_matrix, axis=1)[:, None])
 cf_matrix = cf_matrix / np.sum(cf_matrix, axis=1)[:, None]
@@ -200,4 +270,7 @@ df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
                      columns = [i for i in unique_labels])
 plt.figure(figsize = (12,7))
 sn.heatmap(df_cm, annot=True)
-plt.savefig('output.png')
+if binary_classification:
+    plt.savefig(f'binary_models/{current_action}_cf.png')
+else:
+    plt.savefig('output.png')

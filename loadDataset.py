@@ -26,8 +26,8 @@ def remap_categories(labels, dataset):
         if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
             base_action = 'PICKUP'
 
-        if 'BOLT' in base_action:
-            base_action = 'SCREW'
+        # if 'BOLT' in base_action:
+        #     base_action = 'SCREW'+hand
 
         # if 'ASSEMBLY1' in base_action:
         #     action_dict['ASSEMBLY1'] = [sequence[:,:3]]
@@ -193,7 +193,9 @@ def LowPass(sequence, freq):
     '''UNCOMMENT TO PLOT THE ORIGINAL VS THE FILTERED VERSION'''
     # fig = plt.figure()
     # plt.plot(sequence)
-    b, a = butter(1, freq,btype='low', fs = 1000)
+    fs = 120
+    w = freq / (fs / 2) # Normalize the frequency
+    b, a = butter(5, w, btype='low')
     y = lfilter(b,a,sequence)
     # plt.plot(y)
     # plt.show()
@@ -377,7 +379,7 @@ fig = px.histogram(masked_len_list, nbins=200)
 
 # This gets the action list and removes the '_left' or '_right' from the action name merging into general actions
 # labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
-# labels_list, action_list_np = remap_categories(labels_list, masked_list)
+labels_list, action_list_np = remap_categories(labels_list, masked_list)
 
 tensor_list = [torch.tensor(arr) for arr in masked_list]
 tensor = pad_sequence(tensor_list, batch_first=True)
