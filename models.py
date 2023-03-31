@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import torch
 
 class LSTMMultiClass(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, n_layers, dropout_prob=0.5):
@@ -68,3 +68,110 @@ class TransformerClassifier(nn.Module):
         x = self.fc2(x)
         x = self.softmax(x)
         return x
+    
+
+class CNN_1D(nn.Module):
+    """Model for human-activity-recognition."""
+    def __init__(self, input_size, num_classes, dropout_prob=0.5):
+        super().__init__()
+
+        # Extract features, 1D conv layers
+        self.features = nn.Sequential(
+            nn.Conv1d(input_size, 64, 13),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(2),
+            nn.Conv1d(64, 64, 9),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(2),
+            nn.Conv1d(64, 64, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Dropout(dropout_prob),
+            nn.Flatten(),
+            )
+        # Classify output, fully connected layers
+        self.classifier = nn.Sequential(
+        	nn.Dropout(dropout_prob),
+        	nn.Linear(23488, 128),
+        	nn.ReLU(),
+        	nn.Dropout(dropout_prob),
+        	nn.Linear(128, num_classes),
+            nn.Softmax(dim=1)
+        	)
+
+    def forward(self, x):
+        x = self.features(x.permute(0, 2, 1))
+        # print(x.shape)
+        
+        # x = x.view(x.size(0), 1792)
+        out = self.classifier(x)
+
+        return out
+
+
+class CNN_1D_multihead(nn.Module):
+    """Model for human-activity-recognition."""
+    def __init__(self, input_size, num_classes, dropout_prob=0.5):
+        super().__init__()
+
+        '''Head 1'''
+        # Extract features, 1D conv layers
+        self.head1 = nn.Sequential(
+            nn.Conv1d(input_size, 64, 17),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            nn.Conv1d(64, 64, 11),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Flatten()
+        )
+
+        '''Head 2'''
+        self.head2 = nn.Sequential(
+            nn.Conv1d(input_size, 64, 9),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            # nn.Conv1d(64, 64, 9),
+            # nn.ReLU(),
+            # nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Flatten()
+        )
+
+        '''Head 3'''
+        self.head3 = nn.Sequential(
+            nn.Conv1d(input_size, 64, 5),
+            nn.ReLU(),
+            nn.Dropout(dropout_prob),
+            # nn.Conv1d(64, 64, 3),
+            # nn.ReLU(),
+            # nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Flatten()
+        )
+
+        # Classify output, fully connected layers
+        self.classifier = nn.Sequential(
+        	nn.Dropout(dropout_prob),
+        	nn.Linear(142400, 128),
+        	nn.ReLU(),
+        	nn.Dropout(dropout_prob),
+        	nn.Linear(128, num_classes),
+            nn.Softmax(dim=1)
+        )
+
+    def forward(self, x):
+        x1 = self.head1(x.permute(0, 2, 1))
+        x2 = self.head2(x.permute(0, 2, 1))
+        x3 = self.head3(x.permute(0, 2, 1))
+
+        x = torch.cat((x1, x2, x3), 1)
+        # print(x.shape)
+        
+        # x = x.view(x.size(0), 1792)
+        out = self.classifier(x)
+
+        return out

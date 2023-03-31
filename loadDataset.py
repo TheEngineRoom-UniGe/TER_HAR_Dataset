@@ -19,12 +19,14 @@ def remap_categories(labels, dataset):
 
         if 'FAILED' in label:
             continue
-
-        if 'ASSEMBLY' in base_action:
-            base_action = 'ASSEMBLY'
         
-        if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
-            base_action = 'PICKUP'
+        '''UNCOMMENT THIS TO JOIN ASSEMBLY 1 AND 2'''
+        # if 'ASSEMBLY' in base_action:
+        #     base_action = 'ASSEMBLY'
+        
+        '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
+        # if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
+        #     base_action = 'PICKUP'
 
         # if 'BOLT' in base_action:
         #     base_action = 'SCREW'+hand

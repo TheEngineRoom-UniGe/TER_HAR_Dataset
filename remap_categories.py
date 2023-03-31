@@ -23,12 +23,12 @@ def save_augmented_data(balanced_data, path):
     np_balanced_data = np.row_stack(balanced_data_list)
     n_seqXaction = len(list(values)[0])
     n_actions = len(balanced_data.keys())
-    np_balanced_labels = np.zeros((n_seqXaction*n_actions, 1))
+    np_balanced_labels = np.zeros((n_seqXaction*n_actions, 1), dtype=object)
     for i, key in enumerate(keys):
         # print(i, key)
-        np_balanced_labels[i*n_seqXaction:(i+1)*n_seqXaction] = i
-    np.save(os.path.join(path, 'balanced_data.npy'), np_balanced_data)
-    np.save(os.path.join(path, 'balanced_labels.npy'), np_balanced_labels)
+        np_balanced_labels[i*n_seqXaction:(i+1)*n_seqXaction] = key
+    np.save(os.path.join(path, 'balanced_data1.npy'), np_balanced_data)
+    np.save(os.path.join(path, 'balanced_labels1.npy'), np_balanced_labels)
 
 def switch(augmentation):
     if augmentation == Augmentation.jitter:

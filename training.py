@@ -10,10 +10,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from torcheval.metrics import BinaryAccuracy
 
-from models import LSTMMultiClass, TransformerClassifier, LSTMBinary
+from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
 training = False
 
+balanced_dataset = True
 binary_classification = False
 
 current_action = 'ASSEMBLY1'
@@ -51,6 +52,8 @@ def get_accuracy(pred, test):
 def normalize(data):
     '''Normalizes the data by dividing each feature by its maximum value'''
     maxes = np.amax(data, axis=(0,1))
+    # mins = np.amin(data, axis=(0,1))
+    # return (2*(data-mins)/(maxes-mins))-1
     return data/maxes
 
 
@@ -65,23 +68,36 @@ def add_feature_profiles(dataset):
 
 print("\n--- Data Loading ---")
 
-dataset = np.load('balanced_datasets/balanced_data.npy').astype('float32')
-# dataset = torch.load('filename')
-labels = np.load('balanced_datasets/balanced_labels.npy').astype('int32')
+if balanced_dataset:
+    print("\n--- Loading Balanced Dataset ---")
+    dataset = np.load('balanced_datasets/balanced_data.npy').astype('float32')
+    # dataset = torch.load('filename')
+    labels = np.load('balanced_datasets/balanced_labels.npy', allow_pickle=True)#.astype('int32')
+
+else:
+    print("\n--- Loading Unbalanced Dataset ---")
+    dataset = np.load('data_shape(2699_2981_24).npy').astype('float32')
+    # dataset = torch.load('filename')
+    labels = np.load('labels_shape(2699_1).npy')
+
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
 integer_labels = label_encoder.fit_transform(labels.ravel())
-integer_labels = labels.ravel()
+# if balanced_dataset:
+#     integer_labels = labels.ravel()
 
 
 if binary_classification:
     print("\n--- Reducing to a Binary Classification Problem ---")
     integer_labels = oneVsAll(labels, integer_labels, current_action)
-unique_labels = np.unique(integer_labels)
+unique_labels = np.unique(labels)
+# if balanced_dataset:
+#     unique_labels = np.unique(integer_labels)
 
-dataset = ignore_features(dataset)
-dataset = add_feature_profiles(dataset)
+
+# dataset = ignore_features(dataset)
+# dataset = add_feature_profiles(dataset)
 # dataset = dataset[:,:,12:16]
 
 print("Loaded dataset and labels: ")
@@ -93,8 +109,8 @@ print("Most populated class: ", np.argmax(np.bincount(integer_labels)))
 # Split the data into training and test sets
 train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
 
-# train_dataset = normalize(train_dataset)
-# test_dataset = normalize(test_dataset)  
+train_dataset = normalize(train_dataset)
+test_dataset = normalize(test_dataset)  
 
 print("\nSplitted dataset and labels: ")
 print(f'\t{train_dataset.shape=}')
@@ -124,10 +140,10 @@ if binary_classification:
     output_dim = 1
 else:
     output_dim = y.unique().shape[0]  
-lr = 0.0001
+lr = 0.00005
 epochs = 200
-batch_size = 16
-dropout = 0.5
+batch_size = 4
+dropout = 0.4
 l2_lambda = 0.0001
 
 nheads = 4
@@ -151,7 +167,9 @@ print(f'\t{patience=}\n')
 if binary_classification:
     model = LSTMBinary(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
 else:
-    model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
+    # model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
+    model = CNN_1D(input_dim, output_dim, dropout).cuda()
+    # model = CNN_1D_multihead(input_dim, output_dim).cuda()
 # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 print(f'{model}')
 
@@ -212,7 +230,7 @@ if training:
             del batch_x
             del batch_y
             del output
-
+            torch.cuda.empty_cache()
         model.eval()
 
         y_pred = model(x_val)
@@ -224,6 +242,8 @@ if training:
         else:
             val_loss = criterion(y_pred, y_val)
             acc = get_accuracy(y_pred, y_val)
+
+        del y_pred
 
         print(f"Epoch {epoch}: Training Loss = {loss.item():.4f}, Validation Loss = {val_loss:.4f}, Validation Accuracy = {acc:.2f}")
 
