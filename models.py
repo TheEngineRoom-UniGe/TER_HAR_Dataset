@@ -122,9 +122,9 @@ class CNN_1D_multihead(nn.Module):
             nn.Conv1d(input_size, 64, 17),
             nn.ReLU(),
             nn.Dropout(dropout_prob),
-            nn.Conv1d(64, 64, 11),
-            nn.ReLU(),
-            nn.Dropout(dropout_prob),
+            # nn.Conv1d(64, 64, 11),
+            # nn.ReLU(),
+            # nn.Dropout(dropout_prob),
             nn.MaxPool1d(4),
             nn.Flatten()
         )
@@ -156,7 +156,7 @@ class CNN_1D_multihead(nn.Module):
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
         	nn.Dropout(dropout_prob),
-        	nn.Linear(142400, 128),
+        	nn.Linear(142592, 128),
         	nn.ReLU(),
         	nn.Dropout(dropout_prob),
         	nn.Linear(128, num_classes),

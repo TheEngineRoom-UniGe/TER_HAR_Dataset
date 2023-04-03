@@ -9,6 +9,7 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 from torcheval.metrics import BinaryAccuracy
+from torchsummary import summary
 
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
@@ -70,9 +71,9 @@ print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    dataset = np.load('balanced_datasets/balanced_data.npy').astype('float32')
+    dataset = np.load('balanced_datasets/balanced_data1.npy').astype('float32')
     # dataset = torch.load('filename')
-    labels = np.load('balanced_datasets/balanced_labels.npy', allow_pickle=True)#.astype('int32')
+    labels = np.load('balanced_datasets/balanced_labels1.npy', allow_pickle=True)#.astype('int32')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
@@ -171,9 +172,9 @@ else:
     model = CNN_1D(input_dim, output_dim, dropout).cuda()
     # model = CNN_1D_multihead(input_dim, output_dim).cuda()
 # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
-print(f'{model}')
-
-# Define the loss function and optimizer
+# print(f'{model}')
+summary(model, (dataset[0].shape[0], dataset[0].shape[1]), batch_size, device='cuda')
+# exit()
 if binary_classification:
     criterion= nn.BCELoss()
 else:
@@ -285,11 +286,11 @@ else:
     cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
 print(cf_matrix)
 print(np.sum(cf_matrix, axis=1)[:, None])
-cf_matrix = cf_matrix / np.sum(cf_matrix, axis=1)[:, None]
+cf_matrix = np.around(cf_matrix / np.sum(cf_matrix, axis=1)[:, None] * 100, decimals=1)
 df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
                      columns = [i for i in unique_labels])
 plt.figure(figsize = (12,7))
-sn.heatmap(df_cm, annot=True)
+sn.heatmap(df_cm, annot=True, fmt='g', cmap='Blues')
 if binary_classification:
     plt.savefig(f'binary_models/{current_action}_cf.png')
 else:

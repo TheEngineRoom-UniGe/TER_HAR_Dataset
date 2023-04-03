@@ -21,12 +21,16 @@ def remap_categories(labels, dataset):
             continue
         
         '''UNCOMMENT THIS TO JOIN ASSEMBLY 1 AND 2'''
-        # if 'ASSEMBLY' in base_action:
-        #     base_action = 'ASSEMBLY'
+        if 'ASSEMBLY' in base_action:
+            base_action = 'ASSEMBLY'
         
-        '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
+        # '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
         # if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
         #     base_action = 'PICKUP'
+
+        '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
+        if 'HANDOVER' in base_action or 'DELIVERY' in base_action:
+            base_action = 'HANDOVER'
 
         # if 'BOLT' in base_action:
         #     base_action = 'SCREW'+hand
