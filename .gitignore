@@ -3,7 +3,7 @@
 *.pt
 *.png
 *.pyc
-dataset/
+
 output.png
 lstm_model.pth
-full_sequences
+
