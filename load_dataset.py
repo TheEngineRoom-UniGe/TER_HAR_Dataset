@@ -9,6 +9,15 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
+TRAIN = False
+
+def load_set_indexes(path):
+    with open(path, 'r') as f:
+        content = f.readlines()
+        new_content = []
+        for line in content:
+            new_content.append(line.split('\n')[0])
+    return new_content
 
 def remap_categories(labels, dataset):
     action_dict = {}
@@ -127,13 +136,14 @@ def mergeIntoGeneralActions(labels, actions):
     return labels_list, action_list_np
 
 
-def zeroPadding(dataset):
+def zeroPadding(dataset, maxl):
     n_features = dataset[0].shape[-1]
     print(f'{n_features=}')
-    maxl = 0
-    for sequence in dataset:
-        if sequence.shape[0] >= maxl:
-            maxl = sequence.shape[0]
+    if maxl is None:
+        maxl = 0
+        for sequence in dataset:
+            if sequence.shape[0] >= maxl:
+                maxl = sequence.shape[0]
 
     padded_dataset = np.zeros((len(dataset), maxl, n_features), dtype='float32')
     print(f'{padded_dataset.shape=}')
@@ -224,8 +234,8 @@ def sequence_bondaries(seq, min, max):
     return seq[np.where((seq[:,0] > min) & (seq[:,0] < max))]
 
 def load_synchronized_sensors(abs_path):
-
     '''LOAD THE DATA IN NUMPY'''
+    print(abs_path)
     imu_sensors_data = []
     imu_sensors_names = ['/right_wristPose.txt', '/right_backPose.txt', '/left_wristPose.txt', '/left_backPose.txt']
 
@@ -243,14 +253,16 @@ def load_synchronized_sensors(abs_path):
             imu_sensors_data[i] = sequence_bondaries(imu_sensors_data[i], new_min_stamp, new_max_stamp)
             imu_sensors_data[i] = np.delete(imu_sensors_data[i], 0, 1)
 
-
     '''FREQUENCY FILTERING '''
+    # print(imu_sensors_data[0].shape)
     imu_sensors_data = frequency_analysis(imu_sensors_data)
 
+    # print(imu_sensors_data[0].shape)
     '''RESAMPLING TO MATCH THE SHORTEST SENSOR SEQUENCE'''
     imu_sensors_data = dataResampling(imu_sensors_data)
+    # print(imu_sensors_data[0].shape)
     imu_sensors_data = np.array(imu_sensors_data)
-
+    # print(imu_sensors_data[0].shape)
     '''AT THIS POINT imu_sensors_data CONTAINS THE SEQUENCES OF THE FOUR SENSORS'''
     # print(imu_sensors_data.shape)
     return imu_sensors_data
@@ -258,160 +270,185 @@ def load_synchronized_sensors(abs_path):
 
     
 
+def main():
 
+    dataset_abs_path = f'./dataset'
+    data_dir_list = sorted(os.listdir(dataset_abs_path))
+    print(f'{len(data_dir_list)=}')
 
-dataset_abs_path = f'./dataset'
-data_dir_list = sorted(os.listdir(dataset_abs_path))
+    test_idxs = load_set_indexes('./test_set.txt')
+    # train_idxs = load_set_indexes('./training_set.txt')
 
-action_dict = {}
-maxp = 0
-for participant in data_dir_list:
-    participant_dir = os.path.join(dataset_abs_path, participant)
-    # print(participant_dir)
+    print(f'{len(test_idxs)=}')
+    # print(f'{len(train_idxs)=}')
 
-    list_participant_dir = os.listdir(participant_dir)
-    # print(list_participant_dir)
-
-    for action in list_participant_dir:
-
-        action_dir = os.path.join(participant_dir, action)
-
-        list_action_dir = os.listdir(action_dir)
-        # print(list_action_dir)
-        # print(action)
-        # print(len(list_action_dir))
-        trial_data_list = []
-        for trial_idx in sorted(list_action_dir):
-
-            trial_dir = os.path.join(action_dir, trial_idx)
-            list_trial_dir = os.listdir(trial_dir)
-            # print(trial_idx)
-            if len(list_trial_dir) != 4:
-                # print('Some data file is missing, Skipping this trial!...')
+    action_dict = {}
+    maxp = 0
+    c = 0
+    for participant in data_dir_list:
+        print(participant)
+        if TRAIN:
+            if participant in test_idxs:
                 continue
-
-            action_name = os.path.split(action_dir)[-1]
-            trial_data_list.append(myReshape(load_synchronized_sensors(trial_dir)))
-
-        # print(len(trial_data_list))
-        # print(action_dict.get(action))
-        old_val = action_dict.get(action)
-        # print(action)
-        # print(old_val)
-        if old_val is None:
-            action_dict[action] = [trial_data_list]
         else:
-            new_val = old_val.append(trial_data_list)
-            if new_val is not None:
-                action_dict[action] = new_val
-    maxp +=1
-    # if maxp==5:
-    #     break
-print('\n\nDebugging the action dictionary!\n')
-for key in action_dict.keys():
-    print(key, '->', len(action_dict[key]), 'trials')
+            if participant not in test_idxs:
+                continue
+        participant_dir = os.path.join(dataset_abs_path, participant)
+        # print(participant_dir)
+
+        list_participant_dir = os.listdir(participant_dir)
+        # print(list_participant_dir)
+        # if "49" not in participant:
+        #     continue
+        for action in list_participant_dir:
+
+            action_dir = os.path.join(participant_dir, action)
+
+            list_action_dir = os.listdir(action_dir)
+            # print(list_action_dir)
+            # print(action)
+            # print(len(list_action_dir))
+            trial_data_list = []
+            for trial_idx in sorted(list_action_dir):
+
+                trial_dir = os.path.join(action_dir, trial_idx)
+                list_trial_dir = os.listdir(trial_dir)
+                # print(trial_idx)
+                if len(list_trial_dir) != 4:
+                    # print('Some data file is missing, Skipping this trial!...')
+                    continue
+
+                action_name = os.path.split(action_dir)[-1]
+                trial_data_list.append(myReshape(load_synchronized_sensors(trial_dir)))
+
+            # print(len(trial_data_list))
+            # print(action_dict.get(action))
+            old_val = action_dict.get(action)
+            # print(action)
+            # print(old_val)
+            if old_val is None:
+                action_dict[action] = [trial_data_list]
+            else:
+                new_val = old_val.append(trial_data_list)
+                if new_val is not None:
+                    action_dict[action] = new_val
+        maxp +=1
+        # if maxp==5:
+        #     break
+    print('\n\nDebugging the action dictionary!\n')
+    for key in action_dict.keys():
+        print(key, '->', len(action_dict[key]), 'trials')
 
 
-'''TRANSFORMS THE DICTIONARY IN A LIST OF NPARRAYS'''
-action_list = [v for v in action_dict.values()]
-action_names = [k for k in action_dict.keys()]
-print("\naction list length:", len(action_list), '\n')
-print("\naction names list length:", len(action_names), '\n')
-action_list_np = []
+    '''TRANSFORMS THE DICTIONARY IN A LIST OF NPARRAYS'''
+    action_list = [v for v in action_dict.values()]
+    action_names = [k for k in action_dict.keys()]
+    print("\naction list length:", len(action_list), '\n')
+    print("\naction names list length:", len(action_names), '\n')
+    action_list_np = []
 
-len_list = []
-labels_list = []
+    len_list = []
+    labels_list = []
 
-for action, action_name in zip(action_list, action_names):
-    if len(action) < 12:
-        print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
+    for action, action_name in zip(action_list, action_names):
+        if len(action) < 12:
+            print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
+            print('---------------------------------------------')
+            continue
+        if action_name == 'IDLE':
+            print('IDLEEEEEE')
+            continue
+        print(action_name, " -> ", len(action))
+        for seq_list in action:
+            # print('\t', len(seq_list))
+            for seq in seq_list:
+                # print('\t\t',  seq.shape)
+                len_list.append(seq.shape[0])
+                action_list_np.append(seq)
+                labels_list.append(action_name)
         print('---------------------------------------------')
-        continue
-    if action_name == 'IDLE':
-        print('IDLEEEEEE')
-        continue
-    print(action_name, " -> ", len(action))
-    for seq_list in action:
-        # print('\t', len(seq_list))
-        for seq in seq_list:
-            # print('\t\t',  seq.shape)
-            len_list.append(seq.shape[0])
-            action_list_np.append(seq)
-            labels_list.append(action_name)
-    print('---------------------------------------------')
 
-# action_list_np = np.asarray(action_list_np)
+    # action_list_np = np.asarray(action_list_np)
 
 
-  
-len_list = np.asarray(len_list)
-# labels_list = np.asarray(labels_list)
-# action_list_np = np.asarray(action_list_np)
+    
+    len_list = np.asarray(len_list)
+    # labels_list = np.asarray(labels_list)
+    # action_list_np = np.asarray(action_list_np)
 
-# Treshold to remove outliers with too many samples
-threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
-print(f'{threshold=}')
-mask_np = len_list < threshold
-print(f'{np.count_nonzero(mask_np)=}')
+    # Treshold to remove outliers with too many samples
+    threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
+    threshold = 3000
+    print(f'{threshold=}')
+    mask_np = len_list < threshold
+    print(f'{np.count_nonzero(mask_np)=}')
 
-# mask_np1 = len_list < 100.0
-# print(f'{np.count_nonzero(mask_np1)=}')
-# exit()
-# Plotting the histogram of the lengths of the sequences
-font1 = font={
-                'family' : 'Times New Roman',
-                'size' : 18
-                }
-fig = px.histogram(len_list, nbins=400)
-fig.add_vline(x=np.mean(len_list), annotation_text='  <b>Mean', annotation_position='right', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="black", col=1, row=1)
-fig.add_vline(x=np.median(len_list), annotation_text='<b>Median  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="red", col=1, row=1)
-fig.add_vline(x=np.mean(len_list)+2*np.std(len_list), annotation_text='<b>mean+2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
-fig.add_vline(x=np.mean(len_list)-2*np.std(len_list), annotation_text='<b>mean-2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
-# fig.show()
+    # mask_np1 = len_list < 100.0
+    # print(f'{np.count_nonzero(mask_np1)=}')
+    # exit()
+    # Plotting the histogram of the lengths of the sequences
+    font1 = font={
+                    'family' : 'Times New Roman',
+                    'size' : 18
+                    }
+    fig = px.histogram(len_list, nbins=400)
+    fig.add_vline(x=np.mean(len_list), annotation_text='  <b>Mean', annotation_position='right', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="black", col=1, row=1)
+    fig.add_vline(x=np.median(len_list), annotation_text='<b>Median  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="red", col=1, row=1)
+    fig.add_vline(x=np.mean(len_list)+2*np.std(len_list), annotation_text='<b>mean+2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
+    fig.add_vline(x=np.mean(len_list)-2*np.std(len_list), annotation_text='<b>mean-2*std  ', annotation_position='left', annotation=dict(font=font1), line_width=3, line_dash="dash", line_color="green", col=1, row=1)
+    # fig.show()
 
 
-# Apply the mask to the action list to remove the outliers
-print(len(action_list_np))
-masked_list = list(compress(action_list_np, mask_np))
-labels_list = list(compress(labels_list, mask_np))
-print(len(masked_list))
-print(len(masked_list)/len(action_list_np))
-print(len(action_list_np))
+    # Apply the mask to the action list to remove the outliers
+    print(len(action_list_np))
+    masked_list = list(compress(action_list_np, mask_np))
+    labels_list = list(compress(labels_list, mask_np))
+    print(len(masked_list))
+    print(len(masked_list)/len(action_list_np))
+    print(len(action_list_np))
 
-masked_len_list = list(compress(len_list, mask_np))
-fig = px.histogram(masked_len_list, nbins=200)
-# fig.show()
-# exit()
+    masked_len_list = list(compress(len_list, mask_np))
+    fig = px.histogram(masked_len_list, nbins=200)
+    # fig.show()
+    # exit()
 
-# This gets the action list and removes the '_left' or '_right' from the action name merging into general actions
-# labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
-labels_list, action_list_np = remap_categories(labels_list, masked_list)
+    # This gets the action list and removes the '_left' or '_right' from the action name merging into general actions
+    # labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
+    labels_list, action_list_np = remap_categories(labels_list, masked_list)
 
-tensor_list = [torch.tensor(arr) for arr in masked_list]
-tensor = pad_sequence(tensor_list, batch_first=True)
+    tensor_list = [torch.tensor(arr) for arr in masked_list]
+    tensor = pad_sequence(tensor_list, batch_first=True)
 
-'''APPLY ZERO PADDING TO HAVE SEQUENCES OF THE SAME SIZES'''
-masked_list_np = zeroPadding(action_list_np)
-labels_list = np.asarray(labels_list).reshape(-1, 1)
+    '''APPLY ZERO PADDING TO HAVE SEQUENCES OF THE SAME SIZES'''
+    masked_list_np = zeroPadding(action_list_np, threshold)
+    labels_list = np.asarray(labels_list).reshape(-1, 1)
 
-print(f'{masked_list_np.shape=}')
-print(f'{labels_list.shape=}')
+    print(f'{masked_list_np.shape=}')
+    print(f'{labels_list.shape=}')
 
-# masked_list_np = normalize(masked_list_np)
+    # masked_list_np = normalize(masked_list_np)
 
-# Save stuff
+    # Save stuff
 
-filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
-np.save(filename, masked_list_np)
+    filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
+    if TRAIN:
+        filename = 'train_' + filename
+    else:
+        filename = 'test_' + filename
 
-# filename = "data_shape({}_{}_{}).pt".format(*masked_list_np.shape)
-# torch.save(tensor, filename)
+    np.save(filename, masked_list_np)
 
-filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
-np.save(filename, labels_list)
-print("Unique Labels:", np.unique(labels_list).shape[0])
+    # filename = "data_shape({}_{}_{}).pt".format(*masked_list_np.shape)
+    # torch.save(tensor, filename)
 
-print(f'{tensor.shape=}')
+    filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
+    np.save(filename, labels_list)
+    print("Unique Labels:", np.unique(labels_list).shape[0])
 
-# np_action_list = np.array([v for v in action_dict.values()])
-# print(np_action_list.shape)
+    print(f'{tensor.shape=}')
+
+    # np_action_list = np.array([v for v in action_dict.values()])
+    # print(np_action_list.shape)
+
+if __name__ == '__main__':
+    main()
