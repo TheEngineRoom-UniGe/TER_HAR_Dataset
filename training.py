@@ -65,15 +65,33 @@ def add_feature_profiles(dataset):
     dataset = np.concatenate((dataset, module[..., None]), axis=3)
     return dataset.reshape(dataset.shape[0], dataset.shape[1], -1)
 
+def add_precision_recall(matrix, accuracy):
+    tmp = np.zeros((matrix.shape[0]+1, matrix.shape[1]+1))
+
+    tmp[-1,-1] = accuracy
+    tmp[:-1,:-1] += matrix
+
+    '''PRECISION'''
+    for i in range(matrix.shape[0]):
+        tmp[i, -1] = tmp[i,i] / np.sum(tmp, axis=1)[i] * 100
+    '''RECALL'''
+    for j in range(matrix.shape[1]):
+        tmp[-1, j] = tmp[j,j] / np.sum(tmp, axis=0)[j] * 100
+    
+    return tmp 
+
 
 
 print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    dataset = np.load('balanced_datasets/balanced_data1.npy').astype('float32')
+    train_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # dataset = torch.load('filename')
-    labels = np.load('balanced_datasets/balanced_labels1.npy', allow_pickle=True)#.astype('int32')
+    train_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+    test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
+    # dataset = torch.load('filename')
+    test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
@@ -81,10 +99,12 @@ else:
     # dataset = torch.load('filename')
     labels = np.load('labels_shape(2699_1).npy')
 
+unique_labels = np.unique(train_labels)
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
-integer_labels = label_encoder.fit_transform(labels.ravel())
+train_labels = label_encoder.fit_transform(train_labels.ravel())
+test_labels = label_encoder.fit_transform(test_labels.ravel())
 # if balanced_dataset:
 #     integer_labels = labels.ravel()
 
@@ -92,7 +112,7 @@ integer_labels = label_encoder.fit_transform(labels.ravel())
 if binary_classification:
     print("\n--- Reducing to a Binary Classification Problem ---")
     integer_labels = oneVsAll(labels, integer_labels, current_action)
-unique_labels = np.unique(labels)
+print(unique_labels)
 # if balanced_dataset:
 #     unique_labels = np.unique(integer_labels)
 
@@ -102,13 +122,16 @@ unique_labels = np.unique(labels)
 # dataset = dataset[:,:,12:16]
 
 print("Loaded dataset and labels: ")
-print(f'\t{dataset.shape=}')
-print(f'\t{integer_labels.shape=}')
-print("Most populated class: ", np.argmax(np.bincount(integer_labels)))
-
+# print(f'\t{dataset.shape=}')
+print('TRAIN')
+print(f'\t{train_labels.shape=}')
+print("Most populated class: ", np.argmax(np.bincount(test_labels)))
+print('TEST')
+print(f'\t{test_labels.shape=}')
+print("Most populated class: ", np.argmax(np.bincount(test_labels)))
 
 # Split the data into training and test sets
-train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
+# train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
 
 train_dataset = normalize(train_dataset)
 test_dataset = normalize(test_dataset)  
@@ -134,20 +157,23 @@ print(f'\t{x.shape=}')
 print(f'\t{y.shape=}')
 
 # Define hyperparameters
-input_dim = dataset[0].shape[-1]
-hidden_dim = 128
+input_dim = train_dataset[0].shape[-1]
+hidden_dim = 8
 n_layers = 2
 if binary_classification:
     output_dim = 1
 else:
     output_dim = y.unique().shape[0]  
-lr = 0.00005
+'''multihead cnn works best with 0.0005'''
+'''singlehead cnn works best with 0.0001'''
+
+lr = 0.0005
 epochs = 200
-batch_size = 4
-dropout = 0.4
+batch_size = 8
+dropout = 0.5
 l2_lambda = 0.0001
 
-nheads = 4
+
 
 # Set up early stopping
 patience = 8
@@ -169,11 +195,11 @@ if binary_classification:
     model = LSTMBinary(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
 else:
     # model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
-    model = CNN_1D(input_dim, output_dim, dropout).cuda()
-    # model = CNN_1D_multihead(input_dim, output_dim).cuda()
-# model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
+    # model = CNN_1D(input_dim, output_dim, dropout).cuda()
+    model = CNN_1D_multihead(input_dim, output_dim).cuda()
+    # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 # print(f'{model}')
-summary(model, (dataset[0].shape[0], dataset[0].shape[1]), batch_size, device='cuda')
+# summary(model, (dataset[0].shape[0], dataset[0].shape[      1]), batch_size, device='cuda')
 # exit()
 if binary_classification:
     criterion= nn.BCELoss()
@@ -284,13 +310,15 @@ if binary_classification:
     cf_matrix = confusion_matrix(y_pred, y_test.cpu())
 else:
     cf_matrix = confusion_matrix(torch.argmax(y_pred,1).cpu(), y_test.cpu())
+    # cf_matrix = add_precision_recall(cf_matrix, acc)
+
 print(cf_matrix)
 print(np.sum(cf_matrix, axis=1)[:, None])
-cf_matrix = np.around(cf_matrix / np.sum(cf_matrix, axis=1)[:, None] * 100, decimals=1)
-df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
-                     columns = [i for i in unique_labels])
+cf_matrix = np.around(add_precision_recall(cf_matrix / np.sum(cf_matrix, axis=1)[:, None] * 100, acc), decimals=1)
+# df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
+#                      columns = [i for i in unique_labels])
 plt.figure(figsize = (12,7))
-sn.heatmap(df_cm, annot=True, fmt='g', cmap='Blues')
+sn.heatmap(cf_matrix, annot=True, fmt='g', cmap='Blues')
 if binary_classification:
     plt.savefig(f'binary_models/{current_action}_cf.png')
 else:
