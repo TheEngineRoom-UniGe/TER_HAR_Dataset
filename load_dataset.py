@@ -442,6 +442,10 @@ def main():
     # torch.save(tensor, filename)
 
     filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
+    if TRAIN:
+        filename = 'train_' + filename
+    else:
+        filename = 'test_' + filename
     np.save(filename, labels_list)
     print("Unique Labels:", np.unique(labels_list).shape[0])
 
