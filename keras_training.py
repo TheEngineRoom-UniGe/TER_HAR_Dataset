@@ -5,7 +5,6 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
-from torchsummary import summary
 import transformer
 import keras
 import tensorflow as tf 
@@ -14,7 +13,7 @@ from tensorflow.python.client import device_lib
 
 
 
-from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
+#from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
 training = True
 
@@ -192,14 +191,14 @@ model = transformer.build_model(
     ff_dim=4,
     num_transformer_blocks=4,
     mlp_units=[128],
-    mlp_dropout=0.5,
-    dropout=0.5,
+    mlp_dropout=0.4,
+    dropout=0.2,
     n_classes=unique_labels.shape[0]
 )
 
 model.compile(
     loss="sparse_categorical_crossentropy",
-    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    optimizer=keras.optimizers.Adam(learning_rate=1e-3),
     metrics=["sparse_categorical_accuracy"],
 )
 model.summary()
@@ -211,7 +210,7 @@ model.fit(
     y,
     validation_split=0.2,
     epochs=200,
-    batch_size=2,
+    batch_size=16,
     callbacks=callbacks,
 )
 

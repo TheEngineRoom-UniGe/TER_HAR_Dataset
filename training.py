@@ -13,7 +13,7 @@ from torchsummary import summary
 
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
-training = False
+training = True
 
 balanced_dataset = True
 binary_classification = False
@@ -30,7 +30,7 @@ def oneVsAll(labels, int_labels, label):
     int_labels[~mask] = 1
     return int_labels
 
-def ignore_features(dataset):
+def ignore_gyro_features(dataset):
     '''Excludes gyroscope data from the dataset'''
     mask = np.ones((24), dtype=bool)
     mask[[3,4,5,9,10,11,15,16,17,21,22,23]] = False
@@ -53,10 +53,20 @@ def get_accuracy(pred, test):
 def normalize(data):
     '''Normalizes the data by dividing each feature by its maximum value'''
     maxes = np.amax(data, axis=(0,1))
+    print(maxes)
     # mins = np.amin(data, axis=(0,1))
     # return (2*(data-mins)/(maxes-mins))-1
     return data/maxes
 
+def full_scale_normalize(data):
+    acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
+    gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
+
+    # 1g equals 8192. The full range is 2g
+    data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
+    data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 1000.0
+
+    return data
 
 def add_feature_profiles(dataset):
     '''Adds the module of the 3D vector of each feature to the dataset'''
@@ -89,15 +99,21 @@ if balanced_dataset:
     train_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # dataset = torch.load('filename')
     train_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
-    test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
+    # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
+    # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+
+    test_dataset = np.load('test_data_shape(480_3000_24).npy').astype('float32')
     # dataset = torch.load('filename')
-    test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+    test_labels = np.load('test_labels_shape(480_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    dataset = np.load('data_shape(2699_2981_24).npy').astype('float32')
+    train_dataset = np.load('train_data_shape(2199_3000_24).npy').astype('float32')
     # dataset = torch.load('filename')
-    labels = np.load('labels_shape(2699_1).npy')
+    train_labels = np.load('train_labels_shape(2199_1).npy')
+    test_dataset = np.load('test_data_shape(480_3000_24).npy').astype('float32')
+    # dataset = torch.load('filename')
+    test_labels = np.load('test_labels_shape(480_1).npy')
 
 unique_labels = np.unique(train_labels)
 
@@ -117,7 +133,7 @@ print(unique_labels)
 #     unique_labels = np.unique(integer_labels)
 
 
-# dataset = ignore_features(dataset)
+# dataset = ignore_gyro_features(dataset)
 # dataset = add_feature_profiles(dataset)
 # dataset = dataset[:,:,12:16]
 
@@ -133,8 +149,8 @@ print("Most populated class: ", np.argmax(np.bincount(test_labels)))
 # Split the data into training and test sets
 # train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
 
-train_dataset = normalize(train_dataset)
-test_dataset = normalize(test_dataset)  
+train_dataset = full_scale_normalize(train_dataset)
+test_dataset = full_scale_normalize(test_dataset)  
 
 print("\nSplitted dataset and labels: ")
 print(f'\t{train_dataset.shape=}')
@@ -167,11 +183,11 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0005
+lr = 0.0002
 epochs = 200
-batch_size = 8
+batch_size = 4
 dropout = 0.5
-l2_lambda = 0.0001
+l2_lambda = 0.00005
 
 
 

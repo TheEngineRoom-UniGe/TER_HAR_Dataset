@@ -54,9 +54,9 @@ class TransformerClassifier(nn.Module):
                 d_model = n_features, nhead = n_heads),
             num_layers = n_layers
             )
-        # self.fc1 = nn.Linear(n_features, hidden_dim)
-        # self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, n_classes)
+        self.fc1 = nn.Linear(n_features, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(n_features, n_classes)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
@@ -94,7 +94,7 @@ class CNN_1D(nn.Module):
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
         	nn.Dropout(dropout_prob),
-        	nn.Linear(23488, 128),
+        	nn.Linear(23616, 128),
         	nn.ReLU(),
         	nn.Dropout(dropout_prob),
         	nn.Linear(128, num_classes),
@@ -119,13 +119,16 @@ class CNN_1D_multihead(nn.Module):
         '''Head 1'''
         # Extract features, 1D conv layers
         self.head1 = nn.Sequential(
-            nn.Conv1d(input_size, 64, 17),
+            nn.Conv1d(input_size, 64, 17), #17
             nn.ReLU(),
-            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 11),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            # nn.Dropout(dropout_prob),
             # nn.Conv1d(64, 64, 11),
             # nn.ReLU(),
             # nn.Dropout(dropout_prob),
-            nn.MaxPool1d(4),
             nn.Flatten()
         )
 
@@ -133,11 +136,14 @@ class CNN_1D_multihead(nn.Module):
         self.head2 = nn.Sequential(
             nn.Conv1d(input_size, 64, 9),
             nn.ReLU(),
-            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 7),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            # nn.Dropout(dropout_prob),
             # nn.Conv1d(64, 64, 9),
             # nn.ReLU(),
             # nn.Dropout(dropout_prob),
-            nn.MaxPool1d(4),
             nn.Flatten()
         )
 
@@ -145,20 +151,26 @@ class CNN_1D_multihead(nn.Module):
         self.head3 = nn.Sequential(
             nn.Conv1d(input_size, 64, 5),
             nn.ReLU(),
-            nn.Dropout(dropout_prob),
+            nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 3),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            # nn.Dropout(dropout_prob),
             # nn.Conv1d(64, 64, 3),
             # nn.ReLU(),
             # nn.Dropout(dropout_prob),
-            nn.MaxPool1d(4),
             nn.Flatten()
         )
 
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
         	nn.Dropout(dropout_prob),
-        	nn.Linear(142592, 128),
+        	nn.Linear(35520, 128), #143552
         	nn.ReLU(),
         	nn.Dropout(dropout_prob),
+            # nn.Linear(256, 128),
+        	# nn.ReLU(),
+        	# nn.Dropout(dropout_prob),
         	nn.Linear(128, num_classes),
             nn.Softmax(dim=1)
         )

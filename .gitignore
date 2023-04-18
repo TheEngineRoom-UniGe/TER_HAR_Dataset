@@ -7,3 +7,9 @@
 output.png
 lstm_model.pth
 
+dataset.zip
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/TER_HAR_Dataset.iml
