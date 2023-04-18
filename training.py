@@ -97,14 +97,13 @@ print("\n--- Data Loading ---")
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
     train_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
-    # dataset = torch.load('filename')
     train_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+
     # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
 
-    test_dataset = np.load('test_data_shape(480_3000_24).npy').astype('float32')
-    # dataset = torch.load('filename')
-    test_labels = np.load('test_labels_shape(480_1).npy')
+    test_dataset = np.load('test_no_idle_data_shape(536_3000_24).npy').astype('float32')
+    test_labels = np.load('test_no_idle_labels_shape(536_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
@@ -116,6 +115,7 @@ else:
     test_labels = np.load('test_labels_shape(480_1).npy')
 
 unique_labels = np.unique(train_labels)
+print(unique_labels)
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
@@ -128,7 +128,8 @@ test_labels = label_encoder.fit_transform(test_labels.ravel())
 if binary_classification:
     print("\n--- Reducing to a Binary Classification Problem ---")
     integer_labels = oneVsAll(labels, integer_labels, current_action)
-print(unique_labels)
+
+
 # if balanced_dataset:
 #     unique_labels = np.unique(integer_labels)
 
@@ -140,23 +141,24 @@ print(unique_labels)
 print("Loaded dataset and labels: ")
 # print(f'\t{dataset.shape=}')
 print('TRAIN')
-print(f'\t{train_labels.shape=}')
-print("Most populated class: ", np.argmax(np.bincount(test_labels)))
+# print(f'\t{train_labels.shape=}')
+print("Most populated class: ", unique_labels[np.argmax(np.bincount(test_labels))])
 print('TEST')
-print(f'\t{test_labels.shape=}')
-print("Most populated class: ", np.argmax(np.bincount(test_labels)))
+# print(f'\t{test_labels.shape=}')
+print("Most populated class: ", unique_labels[np.argmax(np.bincount(test_labels))])
 
 # Split the data into training and test sets
 # train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
 
 train_dataset = full_scale_normalize(train_dataset)
 test_dataset = full_scale_normalize(test_dataset)  
-
 print("\nSplitted dataset and labels: ")
 print(f'\t{train_dataset.shape=}')
 print(f'\t{test_dataset.shape=}')
 print(f'\t{train_labels.shape=}')
 print(f'\t{test_labels.shape=}')
+
+
 
 print("\n--- Training ---")
 # Set device to CUDA if available, otherwise use CPU
@@ -183,7 +185,7 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0002
+lr = 0.0001
 epochs = 200
 batch_size = 4
 dropout = 0.5
@@ -215,7 +217,7 @@ else:
     model = CNN_1D_multihead(input_dim, output_dim).cuda()
     # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 # print(f'{model}')
-# summary(model, (dataset[0].shape[0], dataset[0].shape[      1]), batch_size, device='cuda')
+summary(model, (train_dataset[0].shape[0], train_dataset[0].shape[1]), batch_size, device='cuda')
 # exit()
 if binary_classification:
     criterion= nn.BCELoss()

@@ -122,53 +122,50 @@ class CNN_1D_multihead(nn.Module):
             nn.Conv1d(input_size, 64, 17), #17
             nn.ReLU(),
             nn.MaxPool1d(4),
-            nn.Conv1d(64, 64, 11),
-            nn.ReLU(),
-            nn.MaxPool1d(4),
-            # nn.Dropout(dropout_prob),
-            # nn.Conv1d(64, 64, 11),
-            # nn.ReLU(),
-            # nn.Dropout(dropout_prob),
-            nn.Flatten()
-        )
-
-        '''Head 2'''
-        self.head2 = nn.Sequential(
-            nn.Conv1d(input_size, 64, 9),
+            nn.Conv1d(64, 64, 13),
             nn.ReLU(),
             nn.MaxPool1d(4),
             nn.Conv1d(64, 64, 7),
             nn.ReLU(),
             nn.MaxPool1d(4),
-            # nn.Dropout(dropout_prob),
-            # nn.Conv1d(64, 64, 9),
-            # nn.ReLU(),
-            # nn.Dropout(dropout_prob),
+            nn.Flatten()
+        )
+
+        '''Head 2'''
+        self.head2 = nn.Sequential(
+            nn.Conv1d(input_size, 64, 11),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 9),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
             nn.Flatten()
         )
 
         '''Head 3'''
         self.head3 = nn.Sequential(
-            nn.Conv1d(input_size, 64, 5),
+            nn.Conv1d(input_size, 64, 7),
             nn.ReLU(),
             nn.MaxPool1d(4),
+            nn.Conv1d(64, 64, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(4),            
             nn.Conv1d(64, 64, 3),
             nn.ReLU(),
             nn.MaxPool1d(4),
-            # nn.Dropout(dropout_prob),
-            # nn.Conv1d(64, 64, 3),
-            # nn.ReLU(),
-            # nn.Dropout(dropout_prob),
             nn.Flatten()
         )
 
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
         	nn.Dropout(dropout_prob),
-        	nn.Linear(35520, 128), #143552
+        	nn.Linear(8640, 128), #143552 #35520 #8640
         	nn.ReLU(),
         	nn.Dropout(dropout_prob),
-            # nn.Linear(256, 128),
+            # nn.Linear(1024, 128),
         	# nn.ReLU(),
         	# nn.Dropout(dropout_prob),
         	nn.Linear(128, num_classes),

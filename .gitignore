@@ -1,5 +1,4 @@
 *.npy
-*.pth
 *.pt
 *.png
 *.pyc
@@ -13,3 +12,5 @@ dataset.zip
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/TER_HAR_Dataset.iml
+bestmodel87%aug.pth
+bestmodel84%.pth

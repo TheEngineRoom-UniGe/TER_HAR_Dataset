@@ -9,7 +9,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
-TRAIN = False
+TRAIN = True
 USE_IDLE = False
 
 def load_set_indexes(path):
