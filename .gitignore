@@ -1,5 +1,6 @@
 *.npy
 *.pt
+*.pth
 *.png
 *.pyc
 
