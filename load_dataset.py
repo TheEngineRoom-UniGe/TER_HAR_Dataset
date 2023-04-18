@@ -10,6 +10,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
 TRAIN = False
+USE_IDLE = False
 
 def load_set_indexes(path):
     with open(path, 'r') as f:
@@ -28,6 +29,10 @@ def remap_categories(labels, dataset):
 
         if 'FAILED' in label:
             continue
+
+        if not USE_IDLE:
+            if 'IDLE' in base_action:
+                continue
         
         '''UNCOMMENT THIS TO JOIN ASSEMBLY 1 AND 2'''
         if 'ASSEMBLY' in base_action:
@@ -351,10 +356,10 @@ def main():
     labels_list = []
 
     for action, action_name in zip(action_list, action_names):
-        if len(action) < 12:
-            print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
-            print('---------------------------------------------')
-            continue
+        # if len(action) < 12:
+        #     print(">> ", action_name, " -> ", len(action), "SKIPPED! <<")
+        #     print('---------------------------------------------')
+        #     continue
         if action_name == 'IDLE':
             print('IDLEEEEEE')
             continue
@@ -431,10 +436,14 @@ def main():
     # Save stuff
 
     filename = "data_shape({}_{}_{}).npy".format(*masked_list_np.shape)
+
+    if not USE_IDLE:
+        filename = 'no_idle_' + filename
     if TRAIN:
         filename = 'train_' + filename
     else:
         filename = 'test_' + filename
+
 
     np.save(filename, masked_list_np)
 
@@ -442,10 +451,14 @@ def main():
     # torch.save(tensor, filename)
 
     filename = "labels_shape({}_{}).npy".format(*labels_list.shape)
+
+    if not USE_IDLE:
+        filename = 'no_idle_' + filename
     if TRAIN:
         filename = 'train_' + filename
     else:
         filename = 'test_' + filename
+
     np.save(filename, labels_list)
     print("Unique Labels:", np.unique(labels_list).shape[0])
 
