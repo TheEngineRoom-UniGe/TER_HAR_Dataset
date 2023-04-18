@@ -1,11 +1,54 @@
 import os
 import numpy as np
 from load_dataset import load_synchronized_sensors, myReshape
+from models import CNN_1D_multihead
+from torchsummary import summary
+import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.colors import ListedColormap
 
 full_sequences_path = 'full_sequences'
 subj_dir = 's01'
-window_size = 3000
+window_size = 800
+network_size = 3000
+stride = 1
 imu_sensors_names = ['/right_wristPose.txt', '/right_backPose.txt', '/left_wristPose.txt', '/left_backPose.txt']
+
+action_colors   = {0: 'red',            1: 'green',              2: 'blue',          3: 'pink',           4: 'yellow', -1: 'white'}
+cmap = ListedColormap([action_colors[i-1] for i in range(6)])
+action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'HANDOVER',          3: 'PICKUP',           4: 'SCREW'}
+thresholds     = {0: 0.98804504,    1: 0.9947729,  2: 0.99488586,  3: 0.97964764, 4: 0.9955418}
+# not_thresholds = {0: 0.19905082751065495,   1: 0.19994731021579357, 2: 0.19927371749654413, 3: 0.1997907838318497, 4: 0.1996165873249993}
+not_thresholds = {0: 0.25,   1: 0.25, 2: 0.25, 3: 0.25, 4: 0.25}
+
+def label_visualization(action_s_e, sequence_len):
+    canva = np.zeros((sequence_len, 50)) - 1
+    for action, start, end in action_s_e:
+        if action == 'IDLE':
+            canva[start:end, :] = -1
+        else:
+            canva[start:end, :] = list(action_names.values()).index(action)
+    canva = canva.T
+    return canva[::10]
+
+def full_scale_normalize(data):
+    acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
+    gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
+
+    # 1g equals 8192. The full range is 2g
+    data[:,acceleration_idxs] = data[:,acceleration_idxs] / 16384.0
+    data[:,gyroscope_idxs] = data[:,gyroscope_idxs] / 1000.0
+
+    return data
+
+def initialize_and_fill_window(window_size, synchronized_sequences):
+    window_idx = 0
+    window = np.zeros((window_size, synchronized_sequences.shape[1]))
+    while window_idx < window_size:
+        window[window_idx] = synchronized_sequences[window_idx]
+        window_idx += 1
+    return window, window_idx
 
 def find_idx_from_timestamp(tstamps, actions_start_stop):
     idxs = []
@@ -13,9 +56,9 @@ def find_idx_from_timestamp(tstamps, actions_start_stop):
         idxs.append([action[0], np.argmin(np.abs(tstamps - action[1])), np.argmin(np.abs(tstamps - action[2]))])
     return idxs
 
-def slide_window_offline(window, window_idx, synchronized_sequences):
-    window = np.roll(window, 1, axis=0)
-    window[0] = synchronized_sequences[window_idx]
+def slide_window_offline(stride, window, window_idx, synchronized_sequences):
+    window = np.roll(window, -stride, axis=0)
+    window[-1] = synchronized_sequences[window_idx]
     window_idx += 1
     return window, window_idx
 
@@ -37,18 +80,93 @@ print(actions_start_stop)
 
 synchronized_sequences = myReshape(load_synchronized_sensors(subj_dir_full_path))
 print(f'{synchronized_sequences.shape=}')
+print(f'{synchronized_sequences[:3,:6]}')
 
-window_idx = 0
-window = np.zeros((window_size, synchronized_sequences.shape[1]))
-while window_idx < window_size:
-    window[window_idx] = synchronized_sequences[window_idx]
-    window_idx += 1
+sequence_canva = label_visualization(actions_start_stop, synchronized_sequences.shape[0])
+# sequence_canva = np.diag(sequence_canva)
+# print(sequence_canva>0)
+# print(sequence_canva.shape)
+# plt.matshow(sequence_canva)
+# plt.show()
+
+sns.heatmap(sequence_canva, cmap=cmap, yticklabels=False)
+plt.show()
+unpad_unscaled_window, window_idx = initialize_and_fill_window(window_size, synchronized_sequences)
 
 print(f'{window_idx=}')
 
-print(window[:5,:3])
-print(window_idx)
-window, window_idx = slide_window_offline(window, window_idx, synchronized_sequences)
-print(window[:5,:3])
-print(window_idx)
+output_dim = len(action_names.keys())
+input_dim = unpad_unscaled_window.shape[1]
+print(f'{output_dim=}')
+print(f'{input_dim=}')
+
+model = CNN_1D_multihead(input_dim, output_dim).cuda()
+model.load_state_dict(torch.load("best_model.pth"))
+# summary(model, (window_size, input_dim), 1, device='cuda')
+model.eval()
+
+# print(window[:3,:3])
+# print(window_idx)
+# print(synchronized_sequences[:5, :3])
+
+in_action = False
+current_action = -1 
+
+# synchronized_sequences = full_scale_normalize(synchronized_sequences)
+
+''' Loop over all the samples '''
+while window_idx < synchronized_sequences.shape[0]:
+
+    # print(f'{window_idx=}')
+    ''' Slide window of [stride] samples'''
+    unpad_unscaled_window, window_idx = slide_window_offline(stride, unpad_unscaled_window, window_idx, synchronized_sequences)
+    pad = np.zeros((window_size + (network_size - window_size), synchronized_sequences.shape[1]))
+    pad[(network_size - window_size):, :] = unpad_unscaled_window
+    unscaled_window = pad
+
+    window = full_scale_normalize(unscaled_window)
+
+    ''' Add one dimesnion to match batch size of 1 '''
+    window_expanded = np.expand_dims(window, axis=0)
+
+    ''' To tensor '''
+    window_tensor = torch.Tensor(window_expanded).cuda()
+
+    ''' Predict '''
+    prediction = model(window_tensor)
+    predicted_action_idx = torch.argmax(prediction).item()
+
+    current_prediction = prediction[0, predicted_action_idx].item()
+    current_threshold = thresholds[predicted_action_idx]
+
+    # print('Current prediction: ', action_names[predicted_action_idx])
+    # print('current_threshold: ', current_threshold)
+    # print('current_prediction: ', current_prediction)
+    
+
+    # if not in_action:
+    if current_prediction > current_threshold:
+        print(f'Action: {action_names[predicted_action_idx]} at {window_idx - window_size} ___ {current_prediction}')
+        in_action = True
+        current_action = predicted_action_idx
+    else:
+        print(f'Action: IDLE at {window_idx - window_size} ___ {current_prediction}')
+
+    # else:
+    #     current_prediction = prediction[0, current_action].item()
+    #     # print('current_threshold: ', not_thresholds[predicted_action_idx])
+    #     # print('current_prediction: ', prediction[0, current_action].item())
+    #     # if current_prediction == predicted_action_idx:
+    #     if current_prediction < not_thresholds[predicted_action_idx]:
+    #         print(f'Action: {action_names[predicted_action_idx]} finished at {window_idx - window_size}')
+    #         in_action = False
+    #         current_action = -1
+
+    ''' Delete variables '''
+    del window_tensor
+    del prediction
+    del window_expanded
+
+# print(window[:3,:3])
+# print(window_idx)
 

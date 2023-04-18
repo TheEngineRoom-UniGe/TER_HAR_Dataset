@@ -119,7 +119,7 @@ def get_classification_tresholds(preds, labels):
                         not_thresholds[lab].append(y_p[lab])
 
     for key in thresholds:
-        thresholds[key] = np.mean(thresholds[key])*0.8
+        thresholds[key] = np.mean(thresholds[key])#*0.8
     for key in not_thresholds:
         not_thresholds[key] = (1-np.mean(not_thresholds[key])) *0.2
 
@@ -372,6 +372,7 @@ else:
 print(cf_matrix)
 print(np.sum(cf_matrix, axis=1)[:, None])
 cf_matrix = np.around(add_precision_recall(cf_matrix / np.sum(cf_matrix, axis=1)[:, None] * 100, acc), decimals=1)
+
 # df_cm = pd.DataFrame(cf_matrix, index = [i for i in unique_labels],
 #                      columns = [i for i in unique_labels])
 plt.figure(figsize = (12,7))
