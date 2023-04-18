@@ -13,7 +13,7 @@ from torchsummary import summary
 
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
-training = True
+training = False
 
 balanced_dataset = True
 binary_classification = False
@@ -90,6 +90,43 @@ def add_precision_recall(matrix, accuracy):
     
     return tmp 
 
+def get_classification_tresholds(preds, labels):
+    '''Returns the tresholds for each class'''
+
+    preds = preds.cpu()
+    labels = labels.cpu()
+
+    preds = preds.detach().numpy()
+    labels = labels.detach().numpy()
+
+    thresholds = {}
+    not_thresholds = {}
+
+    unique_labels = np.unique(labels)
+
+    for y_p, y_r in zip(preds, labels):
+        if np.argmax(y_p) == y_r:
+            for lab in unique_labels:
+                if lab == y_r:
+                    if y_r not in thresholds.keys():
+                        thresholds[y_r] = [y_p[y_r]]
+                    else:
+                        thresholds[y_r].append(y_p[y_r])
+                else:
+                    if lab not in not_thresholds.keys():
+                        not_thresholds[lab] = [y_p[lab]]
+                    else:
+                        not_thresholds[lab].append(y_p[lab])
+
+    for key in thresholds:
+        thresholds[key] = np.mean(thresholds[key])*0.8
+    for key in not_thresholds:
+        not_thresholds[key] = (1-np.mean(not_thresholds[key])) *0.2
+
+    print(f'{thresholds=}')
+    print(f'{not_thresholds=}')
+
+    return thresholds, not_thresholds
 
 
 print("\n--- Data Loading ---")
@@ -102,8 +139,8 @@ if balanced_dataset:
     # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
 
-    test_dataset = np.load('test_no_idle_data_shape(536_3000_24).npy').astype('float32')
-    test_labels = np.load('test_no_idle_labels_shape(536_1).npy')
+    test_dataset = np.load('test_no_idle_data_shape(535_3000_24).npy').astype('float32')
+    test_labels = np.load('test_no_idle_labels_shape(535_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
@@ -297,7 +334,7 @@ if training:
             if binary_classification:
                 torch.save(model.state_dict(), f"binary_models/{current_action}.pth")
             else:
-                torch.save(model.state_dict(), "lstm_model.pth")
+                torch.save(model.state_dict(), "best_model.pth")
             counter = 0
         else:
             counter += 1
@@ -308,10 +345,12 @@ if training:
 if binary_classification:
     model.load_state_dict(torch.load(f"binary_models/{current_action}.pth"))
 else:
-    model.load_state_dict(torch.load("lstm_model.pth"))
+    model.load_state_dict(torch.load("best_model.pth"))
 model.eval()
 x_test = x_test.cuda()
 y_pred = model(x_test)  
+active_thr, inactive_thr = get_classification_tresholds(y_pred, y_test)
+
 if binary_classification:
     metric = BinaryAccuracy(device=torch.device('cuda'))
     metric.update(y_pred.squeeze().cuda(), y_test.cuda())
