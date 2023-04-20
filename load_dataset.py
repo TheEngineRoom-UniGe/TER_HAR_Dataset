@@ -10,7 +10,12 @@ from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
 TRAIN = True
-USE_IDLE = False
+USE_IDLE = True
+
+# Treshold to remove outliers with too many samples
+# threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
+threshold_high = 500#3000
+threshold_low = 200#150
 
 def load_set_indexes(path):
     with open(path, 'r') as f:
@@ -26,6 +31,8 @@ def remap_categories(labels, dataset):
         # print(label)
         base_action = label.split('_')[0]
         hand = label.split('_')[1]
+
+        # base_action = label
 
         if 'FAILED' in label:
             continue
@@ -43,7 +50,7 @@ def remap_categories(labels, dataset):
         #     base_action = 'PICKUP'
 
         '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
-        if 'HANDOVER' in base_action or 'DELIVERY' in base_action:
+        if 'PICKUP' in base_action or 'DELIVERY' in base_action:
             base_action = 'HANDOVER'
 
         # if 'BOLT' in base_action:
@@ -273,7 +280,27 @@ def load_synchronized_sensors(abs_path):
     return imu_sensors_data
 
 
-    
+def window_augmenter(sequences, labels, max_len, min_len):
+    for seq, lab in zip(sequences, labels):
+        if len(seq) > max_len:
+            remaining_len = seq.shape[0]
+            while remaining_len >= min_len:
+
+                if remaining_len >= max_len:
+                    sequences.append(seq[:max_len])
+                    labels.append(lab)
+                    seq = seq[max_len:]
+                    remaining_len = seq.shape[0]
+
+                else:
+                    sequences.append(seq)
+                    labels.append(lab)
+                    remaining_len = 0
+
+    len_list = [len(seq) for seq in sequences]
+
+    return sequences, labels, np.asarray(len_list)
+
 
 def main():
 
@@ -292,6 +319,7 @@ def main():
     c = 0
     for participant in data_dir_list:
         print(participant)
+        ''' COMMENT THIS TO USE THE FULL DATASET '''
         if TRAIN:
             if participant in test_idxs:
                 continue
@@ -324,6 +352,15 @@ def main():
                     continue
 
                 action_name = os.path.split(action_dir)[-1]
+
+                ''' UNCOMMENT THIS TO DETECT POSSIBLE ERRORS IN THE ANNOTATIONS '''
+                # kk = myReshape(load_synchronized_sensors(trial_dir))
+                # print(kk.shape[0])
+                # if kk.shape[0] > 5000:
+                #     if kk.shape[0] not in [58905, 5316, 5850, 5628]:
+                #         print(participant, action_name, trial_idx)
+                #         exit()
+
                 trial_data_list.append(myReshape(load_synchronized_sensors(trial_dir)))
 
             # print(len(trial_data_list))
@@ -381,11 +418,18 @@ def main():
     # labels_list = np.asarray(labels_list)
     # action_list_np = np.asarray(action_list_np)
 
-    # Treshold to remove outliers with too many samples
-    threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
-    threshold = 3000
-    print(f'{threshold=}')
-    mask_np = len_list < threshold
+    print(f'{threshold_high=}')
+    print(f'{threshold_low=}')
+
+    print('Number of sequences: ', len(action_list_np))
+    print('Number of labels: ', len(labels_list))
+    action_list_np, labels_list, len_list = window_augmenter(action_list_np, labels_list, threshold_high, threshold_low)
+    print('Number of sequences: ', len(action_list_np))
+    print('Number of labels: ', len(labels_list))
+
+    mask_np_high = len_list <= threshold_high
+    mask_np_low = len_list >= threshold_low
+    mask_np = np.logical_and(mask_np_high, mask_np_low)
     print(f'{np.count_nonzero(mask_np)=}')
 
     # mask_np1 = len_list < 100.0
@@ -421,11 +465,48 @@ def main():
     # labels_list, action_list_np = mergeIntoGeneralActions(labels_list, masked_list)
     labels_list, action_list_np = remap_categories(labels_list, masked_list)
 
+    print(np.unique(labels_list), len(labels_list), len(action_list_np))
+    unique_labels = np.unique(labels_list)
+    len_dict = {lab: val for lab, val in zip(unique_labels, np.zeros((unique_labels.shape[0])))}
+    lab_repetitions = {lab: val for lab, val in zip(unique_labels, np.zeros((unique_labels.shape[0])))}
+    len_x_action = {lab: [] for lab in unique_labels}
+    print(len_dict)
+    for lab, seq in zip(labels_list, action_list_np):
+        len_x_action[lab].append(seq.shape[0])
+        len_dict[lab] += seq.shape[0]
+        lab_repetitions[lab] +=1
+
+    print(lab_repetitions)
+    print(len_dict)
+
+    avg_seq_len = {lab:len_dict[lab]/lab_repetitions[lab] for lab in unique_labels}
+    print(avg_seq_len)
+    print(len_x_action)
+    plt.boxplot(len_x_action.values(), labels=len_x_action.keys())
+    plt.xticks(rotation=45)
+    plt.show()
+
+    fig, axs = plt.subplots(len(len_x_action.keys()))
+    for i in range(len(len_x_action.keys())):
+
+        axs[i].hist(len_x_action[unique_labels[i]], bins=20)
+        axs[i].set_title(unique_labels[i])
+        axs[i].set_xlabel('Length')
+        axs[i].set_ylabel('N_samples')
+        axs[i].set_xlim(threshold_low, threshold_high)
+
+    plt.show()
+    print('After removing outliers, with threshold_low = {} and threshold_high = {}'.format(threshold_low, threshold_high))
+    print('Number of sequences: ', len(action_list_np))
+    print('Number of labels: ', len(labels_list))
+
+    
+    exit()
     tensor_list = [torch.tensor(arr) for arr in masked_list]
     tensor = pad_sequence(tensor_list, batch_first=True)
 
     '''APPLY ZERO PADDING TO HAVE SEQUENCES OF THE SAME SIZES'''
-    masked_list_np = zeroPadding(action_list_np, threshold)
+    masked_list_np = zeroPadding(action_list_np, threshold_high)
     labels_list = np.asarray(labels_list).reshape(-1, 1)
 
     print(f'{masked_list_np.shape=}')
