@@ -162,7 +162,7 @@ class CNN_1D_multihead(nn.Module):
         # Classify output, fully connected layers
         self.classifier = nn.Sequential(
         	nn.Dropout(dropout_prob),
-        	nn.Linear(8640, 128), #143552 #35520 #8640
+        	nn.Linear(1088, 128), #143552 #35520 #8640
         	nn.ReLU(),
         	nn.Dropout(dropout_prob),
             # nn.Linear(1024, 128),
