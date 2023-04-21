@@ -51,7 +51,7 @@ def remap_categories(labels, dataset):
 
         '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
         if 'PICKUP' in base_action or 'DELIVERY' in base_action:
-            base_action = 'HANDOVER'
+            base_action = 'PICKUP'
 
         # if 'BOLT' in base_action:
         #     base_action = 'SCREW'+hand
@@ -501,7 +501,6 @@ def main():
     print('Number of labels: ', len(labels_list))
 
     
-    exit()
     tensor_list = [torch.tensor(arr) for arr in masked_list]
     tensor = pad_sequence(tensor_list, batch_first=True)
 

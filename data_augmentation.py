@@ -27,8 +27,8 @@ def save_augmented_data(balanced_data, path):
     for i, key in enumerate(keys):
         print(i, key)
         np_balanced_labels[i*n_seqXaction:(i+1)*n_seqXaction] = key
-    np.save(os.path.join(path, 'train_balanced_data.npy'), np_balanced_data)
-    np.save(os.path.join(path, 'train_balanced_labels.npy'), np_balanced_labels)
+    np.save(os.path.join(path, "train_balanced_data({}_{}_{}).npy".format(*np_balanced_data.shape)), np_balanced_data)
+    np.save(os.path.join(path, "train_balanced_labels({}_{}_{}).npy".format(*np_balanced_data.shape)), np_balanced_labels)
 
 def switch(augmentation):
     if augmentation == Augmentation.jitter:
@@ -117,8 +117,8 @@ def print_action_dict(action_dict):
     for key in action_dict:
         print(key, '---->', len(action_dict[key]))
 
-dataset = np.load('train_no_idle_data_shape(2147_3000_24).npy').astype('float64')
-labels = np.load('train_no_idle_labels_shape(2147_1).npy')
+dataset = np.load('train_data_shape(4704_500_24).npy').astype('float64')
+labels = np.load('train_labels_shape(4704_1).npy')
 
 print(dataset.shape)
 print('Unique labels:')
