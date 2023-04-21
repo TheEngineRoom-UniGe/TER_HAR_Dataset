@@ -133,14 +133,14 @@ print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    train_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
-    train_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+    train_dataset = np.load('balanced_datasets/train_balanced_data(6876_500_24)').astype('float32')
+    train_labels = np.load('balanced_datasets/train_balanced_labels(6876_500_24)', allow_pickle=True)#.astype('int32')
 
     # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
 
-    test_dataset = np.load('test_no_idle_data_shape(535_3000_24).npy').astype('float32')
-    test_labels = np.load('test_no_idle_labels_shape(535_1).npy')
+    test_dataset = np.load('test_no_idle_data_shape(4704_500_24).npy').astype('float32')
+    test_labels = np.load('test_no_idle_labels_shape(4704_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
