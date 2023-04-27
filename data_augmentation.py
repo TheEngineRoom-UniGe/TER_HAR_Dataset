@@ -28,7 +28,7 @@ def save_augmented_data(balanced_data, path):
         print(i, key)
         np_balanced_labels[i*n_seqXaction:(i+1)*n_seqXaction] = key
     np.save(os.path.join(path, "train_balanced_data({}_{}_{}).npy".format(*np_balanced_data.shape)), np_balanced_data)
-    np.save(os.path.join(path, "train_balanced_labels({}_{}_{}).npy".format(*np_balanced_data.shape)), np_balanced_labels)
+    np.save(os.path.join(path, "train_balanced_labels({}_{}).npy".format(*np_balanced_labels.shape)), np_balanced_labels)
 
 def switch(augmentation):
     if augmentation == Augmentation.jitter:

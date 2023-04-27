@@ -13,7 +13,7 @@ from torchsummary import summary
 
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
-training = False
+training = True
 
 balanced_dataset = True
 binary_classification = False
@@ -133,23 +133,23 @@ print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    train_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
-    train_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+    train_dataset = np.load('balanced_datasets/train_balanced_data(6345_500_24).npy').astype('float32')
+    train_labels = np.load('balanced_datasets/train_balanced_labels(6345_1).npy', allow_pickle=True)#.astype('int32')
 
     # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
     # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
 
-    test_dataset = np.load('test_no_idle_data_shape(535_3000_24).npy').astype('float32')
-    test_labels = np.load('test_no_idle_labels_shape(535_1).npy')
+    test_dataset = np.load('test_data_shape(1184_500_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape(1184_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    train_dataset = np.load('train_data_shape(2199_3000_24).npy').astype('float32')
+    train_dataset = np.load('train_data_shape(4704_500_24).npy').astype('float32')
     # dataset = torch.load('filename')
-    train_labels = np.load('train_labels_shape(2199_1).npy')
-    test_dataset = np.load('test_data_shape(480_3000_24).npy').astype('float32')
+    train_labels = np.load('train_labels_shape(4704_1).npy')
+    test_dataset = np.load('test_data_shape(1184_500_24).npy').astype('float32')
     # dataset = torch.load('filename')
-    test_labels = np.load('test_labels_shape(480_1).npy')
+    test_labels = np.load('test_labels_shape(1184_1).npy')
 
 unique_labels = np.unique(train_labels)
 print(unique_labels)
@@ -224,7 +224,7 @@ else:
 
 lr = 0.0001
 epochs = 200
-batch_size = 4
+batch_size = 16
 dropout = 0.5
 l2_lambda = 0.00005
 
@@ -327,10 +327,11 @@ if training:
 
         del y_pred
 
-        print(f"Epoch {epoch}: Training Loss = {loss.item():.4f}, Validation Loss = {val_loss:.4f}, Validation Accuracy = {acc:.2f}")
+        best = ""
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            best = " -- Best Yet"
             if binary_classification:
                 torch.save(model.state_dict(), f"binary_models/{current_action}.pth")
             else:
@@ -338,6 +339,9 @@ if training:
             counter = 0
         else:
             counter += 1
+        
+        print(f"Epoch {epoch}: Training Loss = {loss.item():.4f}, Validation Loss = {val_loss:.4f}, Validation Accuracy = {acc:.2f}" + best)
+        
         if counter == patience:
             print(f"Stopping training after {epoch} epochs due to no improvement in validation loss.")
             break
