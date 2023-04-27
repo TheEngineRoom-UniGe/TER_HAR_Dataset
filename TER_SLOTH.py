@@ -24,6 +24,7 @@ class TER_sloth:
         self.probabilities = np.empty((1,self.probabilities_size,self.class_size))
         self.probabilities[:] = np.nan
 
+        ''' SLOTH parameters '''
         self.rho = rho
         self.tau = tau
         self.c = c
@@ -46,13 +47,14 @@ class TER_sloth:
         self.gestures = []
 
         ''' Stuff for plotting'''
-        plt.ion()
-        self.fig, self.axs = plt.subplots(len(c))
-        self.fig.set_figheight(10)
-        self.fig.set_figwidth(16)
-        self.plot_buffer = np.zeros((len(c), window_size))
+        # plt.ion()
+        # self.fig, self.axs = plt.subplots(len(c))
+        # self.fig.set_figheight(10)
+        # self.fig.set_figwidth(16)
+        # self.plot_buffer = np.zeros((len(c), window_size))
 
 
+    '''plot the classification results in a live plot'''
     def update_plot(self, new_classification, time):
         self.plot_buffer = np.roll(self.plot_buffer, -1, axis=1)
         self.plot_buffer[:,-1] = new_classification
@@ -66,10 +68,10 @@ class TER_sloth:
             self.axs[i].scatter(x, self.plot_buffer[i], s=0.4, c=self.action_colors[i])
             self.axs[i].set_ylim([-0.1, 1.1])
             self.axs[i].set_title(self.action_names[i])
-
         self.fig.canvas.flush_events()
 
-    
+
+    '''prints the classification results in the terminal'''
     def update_terminal_stats(self, new_classification, time):
         print("=====================================")  
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -80,7 +82,7 @@ class TER_sloth:
         print("=====================================")
 
 
-
+    '''classify input window'''
     def classify(self, input_data):
         # if not np.any(np.isnan(self.window)):
             # with self.graph.as_default():
@@ -96,6 +98,8 @@ class TER_sloth:
         # else:
         #     print("The sliding window is not completely full")
 
+
+    '''detect gestures'''
     def detect(self):
         delta_prob = (self.probabilities[0,-1,:] - self.probabilities[0,-1-1,:]) 
         possible_peaks = np.where(delta_prob > self.rho)

@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 from TER_SLOTH import TER_sloth
-import rospy
+from scipy.signal import butter, lfilter
 import time as t
+
+FREQ = 25
 
 plot_sequence_labels = False 
 
@@ -22,7 +24,8 @@ imu_sensors_names = ['/right_wristPose.txt', '/right_backPose.txt', '/left_wrist
 
 action_colors   = {0: 'red',            1: 'green',              2: 'blue',          3: 'pink',           4: 'yellow', -1: 'white'}
 cmap = ListedColormap([action_colors[i-1] for i in range(6)])
-action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'HANDOVER',          3: 'PICKUP',           4: 'SCREW'}
+# action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'HANDOVER',          3: 'PICKUP',           4: 'SCREW'}
+action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'IDLE',          3: 'PICKUP',           4: 'SCREW'}
 thresholds     = {0: 0.98804504,    1: 0.9947729,  2: 0.99488586,  3: 0.97964764, 4: 0.9955418}
 
 gamma = 1
@@ -62,6 +65,9 @@ def window_update_offline(stride, window_size, network_size, window_idx, unpad_u
     ''' Normalize on full scale range '''
     window = full_scale_normalize(unscaled_window)
 
+    ''' Frequency analysis '''
+    window = frequency_analysis(window)
+
     ''' Add one dimesnion to match batch size of 1 '''
     window_expanded = np.expand_dims(window, axis=0)
 
@@ -80,6 +86,30 @@ def full_scale_normalize(data):
     data[:,gyroscope_idxs] = data[:,gyroscope_idxs] / 1000.0
 
     return data
+
+
+def low_pass(sequence, freq):
+    '''UNCOMMENT TO PLOT THE ORIGINAL VS THE FILTERED VERSION'''
+    # fig = plt.figure()
+    # plt.plot(sequence)
+    # print(sequence)
+    # print(sequence.shape)
+    fs = 120
+    w = freq / (fs / 2) # Normalize the frequency
+    b, a = butter(5, w, btype='low')
+    y = lfilter(b,a,sequence)
+    # plt.plot(y)
+    # plt.show()
+    return y
+
+def frequency_analysis(data):
+    newdata = data.copy()
+
+    '''FOR EACH SENSOR FOR EACH FEATURE FILTER THE DATA AND RETURN THE NEW SEQUENCES'''
+    for j in range(data.shape[1]):
+        data[:,j] = low_pass(data[:,j], FREQ)
+
+    return newdata
 
 
 def initialize_and_fill_window(window_size, synchronized_sequences):
@@ -151,9 +181,14 @@ action_time = 0
 start_time = -1
 # synchronized_sequences = full_scale_normalize(synchronized_sequences)
 
-sloth = TER_sloth(model, window_size=window_size, class_size=output_dim, 
-                  feature_size=synchronized_sequences.shape[1], rho=Rho, 
-                  tau=Tau, c=C, action_names=action_names, 
+sloth = TER_sloth(model, 
+                  window_size=window_size, 
+                  class_size=output_dim, 
+                  feature_size=synchronized_sequences.shape[1], 
+                  rho=Rho, 
+                  tau=Tau, 
+                  c=C, 
+                  action_names=action_names, 
                   action_colors=action_colors)
 
 # rospy.init_node('realtime_classification', anonymous=True)
@@ -167,7 +202,7 @@ while window_idx < synchronized_sequences.shape[0]:
     # print(f'{window_idx=}')
     ''' Slide Window, padding, scaling, adding dummy dimension to match batch size of 1'''
     window_tensor, window_idx, unpad_unscaled_window = window_update_offline(stride, window_size, network_size, window_idx, unpad_unscaled_window, synchronized_sequences)
-    # print(f'{window_tensor.shape=}')
+    # print(f'{window_tensor[0,0,:]}')
     # model(window_tensor)
     ''' Classify current window '''
 
@@ -176,7 +211,7 @@ while window_idx < synchronized_sequences.shape[0]:
     pred, time = sloth.classify(window_tensor)
 
     # sloth.update_plot(pred, time)
-    # sloth.update_terminal_stats(pred, time)
+    sloth.update_terminal_stats(pred, time)
     current_action = np.argmax(pred)
     current_prob = pred[current_action]
     # print(action_names[current_action], current_prob, '----', time)
@@ -195,7 +230,7 @@ while window_idx < synchronized_sequences.shape[0]:
     #         action_time +=1
 
 
-    sloth.detect()
+    # sloth.detect()
     # print(f'FPS = {(t.time() - tic)}')
 
     # ''' Predict '''

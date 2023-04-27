@@ -4,15 +4,23 @@ import numpy as np
 import torch
 from models import CNN_1D_multihead
 from TER_SLOTH import TER_sloth
+from scipy.signal import butter, lfilter
+from threading import Lock
+import matplotlib.pyplot as plt
 
 in_topic = '/har_packets'
+FREQ = 25
+
 
 class OnlineClassification:
+
     def __init__(self, window_size=500, feature_size=24, n_actions=5, model_uri="best_model_idle.pth", do_plot=False):
+
         self.window_size = window_size
         self.feature_size = feature_size
         self.n_actions = n_actions
         self.do_plot = do_plot
+        self.mutex = Lock()
 
         '''initialize SLOTH parameters'''
         gamma = 1
@@ -20,29 +28,36 @@ class OnlineClassification:
         Rho = 0.08
         Tau = [gamma * value for value in [0.98804504, 0.9947729, 0.99488586, 0.97964764, 0.9955418]]
         C = [theta * value for value in [742.6095076400679, 1180.1586021505377, 1012.3956989247312, 323.61538461538464, 1106.9691943127962]]
+        C = [ window_size/2 for i in range(5)]
 
         action_colors   = {0: 'red',            1: 'green',              2: 'blue',          3: 'pink',           4: 'yellow', -1: 'white'}
-        action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'HANDOVER',          3: 'PICKUP',           4: 'SCREW'}
+        action_names    = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'IDLE',          3: 'PICKUP',           4: 'SCREW'}
 
 
         '''initialize the model'''
         self.model = CNN_1D_multihead(feature_size, n_actions).cuda()
         self.model.load_state_dict(torch.load(model_uri))
 
-        self.sloth = TER_sloth(self.model, window_size=window_size, 
-                               class_size=n_actions, feature_size=feature_size, 
-                               rho=Rho, tau=Tau, c=C, action_names=action_names, 
+        self.sloth = TER_sloth(self.model, 
+                               window_size=window_size, 
+                               class_size=n_actions, 
+                               feature_size=feature_size, 
+                               rho=Rho, 
+                               tau=Tau, 
+                               c=C, 
+                               action_names=action_names, 
                                action_colors=action_colors)
         
         '''initialize latest sample to feed into the window'''
         self.latest_sample = np.empty((1, self.feature_size))
-        self.latest_sample[:] = np.nan
-
+        # self.latest_sample[:] = np.nan
+        self.latest_sample.fill(np.nan)
         '''initialize the window'''
         self.window = np.zeros((1, self.window_size, self.feature_size))
 
         # '''initialize the subscriber'''
         # self.sub = rospy.Subscriber(in_topic, String, self.callback)
+
 
     def try_unpack_msg(self, msg):
         '''check if the message is valid'''
@@ -50,55 +65,102 @@ class OnlineClassification:
         if len(arg_list) != 7:
             print('Invalid message')
             return None, None           
-        return arg_list[:-1], arg_list[-1]
+        return [float(x) for x in arg_list[:-1]], arg_list[-1]
 
 
-    def full_scale_normalize(data):
+    def low_pass(self, sequence, freq):
+        '''UNCOMMENT TO PLOT THE ORIGINAL VS THE FILTERED VERSION'''
+        # fig = plt.figure()
+        # plt.plot(sequence)
+        # print(sequence)
+        # print(sequence.shape)
+        fs = 120
+        w = freq / (fs / 2) # Normalize the frequency
+        b, a = butter(5, w, btype='low')
+        y = lfilter(b,a,sequence)
+        # plt.plot(y)
+        # plt.show()
+        return y
+
+    def frequency_analysis(self, data):
+        global FREQ
+        newdata = data.copy()
+
+        '''FOR EACH SENSOR FOR EACH FEATURE FILTER THE DATA AND RETURN THE NEW SEQUENCES'''
+        for j in range(data.shape[2]):
+            data[0,:,j] = self.low_pass(data[0,:,j], FREQ)
+
+        return newdata
+
+
+    def full_scale_normalize(self, data):
+        tmp = data.copy()
         acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
         gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
 
         # 1g equals 8192. The full range is 2g
-        data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
-        data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 1000.0
-
-        return data
+        tmp[:,:,acceleration_idxs] = tmp[:,:,acceleration_idxs] / 16384.0
+        tmp[:,:,gyroscope_idxs] = tmp[:,:,gyroscope_idxs] / 1000.0
+        return tmp
 
 
     def sensor_switch(self, sensor_id):
         '''['/right_wristPose.txt', '/right_backPose.txt', '/left_wristPose.txt', '/left_backPose.txt']'''
-        if sensor_id == 0:
+        if sensor_id == 'right_wrist':
             return 0
-        elif sensor_id == 1:
+        elif sensor_id == 'right_back':
             return 6
-        elif sensor_id == 2:
+        elif sensor_id == 'left_wrist':
             return 12
-        elif sensor_id == 3:
+        elif sensor_id == 'left_back':
             return 18
 
 
+    def update_terminal_stats(self, new_classification, time):
+        print("=====================================")  
+        # os.system('cls' if os.name == 'nt' else 'clear')
+        print("Time: ", time)
+        print("Action: ", self.sloth.action_names[np.argmax(new_classification)])
+        for i in range(new_classification.shape[0]):
+            print(f'{self.sloth.action_names[i]} : {new_classification[i]:.2f}')
+        print("=====================================")
+
+
     def callback(self, data):
-        arg_list, sensor_name = self.try_unpack_msg(data.data)
-        if arg_list is not None and sensor_name is not None:
-            print(f'{sensor_name=}')
-            print(f'{arg_list=}')
+        self.mutex.acquire()
 
-            id = self.sensor_switch(sensor_name)
-            self.latest_sample[id : id + 5] = arg_list[:-1]
+        try:
+            arg_list, sensor_name = self.try_unpack_msg(data.data)
+            if arg_list is not None and sensor_name is not None:
+                # print(f'{sensor_name=}')
+                # print(f'{arg_list=}')
+                # print(not np.isnan(self.latest_sample).any())
+                id = self.sensor_switch(sensor_name)
+                # print(f'{id=}')
+                # print(f'{self.latest_sample.shape=}')
+                
+                self.latest_sample[0, id : id + 6] = arg_list
 
-            if not np.any(np.isnan(self.window)):
-                self.window = np.roll(self.window, -1, 1)
-                self.window[:, -1, :] = self.latest_sample
+                if not np.isnan(self.latest_sample).any() and not np.isnan(self.window).any():
+                    self.window = np.roll(self.window, self.window_size-1, axis=1)
+                    # print(f'{self.latest_sample=}')
+                    self.window[0, -1, :] = self.latest_sample
 
-                scaled_window = self.full_scale_normalize(self.window)
+                    scaled_window = self.frequency_analysis(self.window)
+                    scaled_window = self.full_scale_normalize(self.window)
 
-                prediction, time = self.sloth.classify(scaled_window)
-
-                if self.do_plot:
-                    self.sloth.update_plot(prediction, time)
-                self.sloth.update_terminal_stats(prediction, time)
-                self.latest_sample[:] = np.nan
-            else: 
-                return
+                    scaled_tensor_window = torch.from_numpy(scaled_window).float().cuda()
+                    prediction, time = self.sloth.classify(scaled_tensor_window)
+                    # print(self.window[0, -500, :])
+                    # print(self.window.shape)
+                    # sys.exit()
+                    if self.do_plot:
+                        self.sloth.update_plot(prediction, time)
+                    self.latest_sample.fill(np.nan)
+                    self.update_terminal_stats(prediction, time)
+        finally:
+            self.mutex.release()
+        return
 
 
     def get_classification(self):
@@ -108,7 +170,7 @@ class OnlineClassification:
     def listener(self):
         rospy.init_node('online_classification', anonymous=True)
         rospy.Subscriber(in_topic, String, self.callback)
-
+        rospy.spin()
 
 
 if __name__ == '__main__':
@@ -116,5 +178,5 @@ if __name__ == '__main__':
                               feature_size=24, 
                               n_actions=5, 
                               model_uri="best_model_idle.pth",
-                              do_plot=True)
+                              do_plot=False)
     OC.listener()
