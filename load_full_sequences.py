@@ -28,8 +28,10 @@ for subj_dir in sorted(segmented_data_folders):
                 action_name = 'ASSEMBLY'
             if 'FAILED' in action_name:
                 continue
-            if 'HANDOVER' in action_name or 'DELIVERY' in action_name:
-                action_name = 'HANDOVER'
+            if 'IDLE' in action_name:
+                continue
+            if 'HANDOVER' in action_name or 'DELIVERY' in action_name or 'PICKUP' in action_name:
+                action_name = 'PICKUP'
 
             action_dir_full_path = os.path.join(subj_dir_full_path, action_dir)
             # print('\n')

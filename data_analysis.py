@@ -47,11 +47,10 @@ for subj_dir in os.listdir(full_sequences_path):
 
 class_distribution = [len(action_lengths[key]) for key in sorted(action_lengths.keys())]
 class_length_distribution = [action_total_length[key]/len(action_lengths[key])*100 for key in sorted(action_lengths.keys())]
-print('Keys:', sorted(action_lengths.keys()))
 
 print(class_length_distribution)
-exit()
 print('Keys:', sorted(action_lengths.keys()))
+
 global_lengths = [item for sublist, action in zip(action_lengths.values(), action_lengths.keys()) for item in sublist if 'SCREW' in action]
 
 font1 = font={

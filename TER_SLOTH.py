@@ -4,18 +4,19 @@ import numpy as np
 import tensorflow as tf
 from keras.models import load_model
 import matplotlib.pyplot as plt
+import os
 
 
 class TER_sloth:
-    def __init__(self, py_model, window_size, class_size, feature_size, rho, tau, c):
-        # self.model_path = model_path
+    def __init__(self, py_model, window_size, class_size, feature_size, rho, tau, c, action_names, action_colors):
+
         self.window_size = window_size
         self.class_size = class_size
         self.feature_size = feature_size
         self.probabilities_size = window_size
-        self.action_names   = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'HANDOVER',          3: 'PICKUP',           4: 'SCREW'}
+        self.action_names = action_names
+        self.action_colors = action_colors
 
-        # self.graph = tf.get_default_graph()
         self.model = py_model
         self.window = np.empty((1,self.window_size,self.feature_size))
         self.window[:] = np.nan
@@ -44,7 +45,43 @@ class TER_sloth:
 
         self.gestures = []
 
-    def classify_offline(self, input_data):
+        ''' Stuff for plotting'''
+        plt.ion()
+        self.fig, self.axs = plt.subplots(len(c))
+        self.fig.set_figheight(10)
+        self.fig.set_figwidth(16)
+        self.plot_buffer = np.zeros((len(c), window_size))
+
+
+    def update_plot(self, new_classification, time):
+        self.plot_buffer = np.roll(self.plot_buffer, -1, axis=1)
+        self.plot_buffer[:,-1] = new_classification
+
+        x = range(time-1, self.plot_buffer.shape[1]+time-1)
+        # print([xi + time -1 for xi in x])
+        # exit()
+        
+        for i in range(self.plot_buffer.shape[0]):
+            self.axs[i].clear()
+            self.axs[i].scatter(x, self.plot_buffer[i], s=0.4, c=self.action_colors[i])
+            self.axs[i].set_ylim([-0.1, 1.1])
+            self.axs[i].set_title(self.action_names[i])
+
+        self.fig.canvas.flush_events()
+
+    
+    def update_terminal_stats(self, new_classification, time):
+        print("=====================================")  
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("Time: ", time)
+        print("Action: ", self.action_names[np.argmax(new_classification)])
+        for i in range(new_classification.shape[0]):
+            print(f'{self.action_names[i]} : {new_classification[i]:.2f}')
+        print("=====================================")
+
+
+
+    def classify(self, input_data):
         # if not np.any(np.isnan(self.window)):
             # with self.graph.as_default():
         self.probabilities = np.roll(self.probabilities,-1,1)
@@ -83,7 +120,7 @@ class TER_sloth:
                 start = int(self.probabilities_size-time_diff)
                 prob_mean = np.mean(self.probabilities[0,start:,ids])
                 if prob_mean > self.tau[ids]:
-                    # print(self.action_names[ids], '---', self.time-time_diff, '-', self.time)
+                    print(self.action_names[ids], '---', self.time-time_diff, '-', self.time)
                     self.peaks[0, ids] = 0
                     self.gestures.append(ids+1)
 
