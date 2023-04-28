@@ -88,7 +88,7 @@ class OnlineClassification:
 
         '''FOR EACH SENSOR FOR EACH FEATURE FILTER THE DATA AND RETURN THE NEW SEQUENCES'''
         for j in range(data.shape[2]):
-            data[0,:,j] = self.low_pass(data[0,:,j], FREQ)
+            newdata[0,:,j] = self.low_pass(newdata[0,:,j], FREQ)
 
         return newdata
 
