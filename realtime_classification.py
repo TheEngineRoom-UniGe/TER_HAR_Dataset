@@ -167,7 +167,7 @@ print(f'{output_dim=}')
 print(f'{input_dim=}')
 
 model = CNN_1D_multihead(input_dim, output_dim).cuda()
-model.load_state_dict(torch.load("best_model_idle.pth"))
+model.load_state_dict(torch.load("best_model_idle_ols.pth"))
 # summary(model, (window_size, input_dim), 1, device='cuda')
 model.eval()
 
@@ -209,9 +209,14 @@ while window_idx < synchronized_sequences.shape[0]:
     # print(window_tensor.shape)
     # print(window_tensor[0, -3:, :3])
     pred, time = sloth.classify(window_tensor)
+    print("=====================================")
+    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][:6])
+    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][6:12])
+    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][12:18])
+    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][18:24])
 
     # sloth.update_plot(pred, time)
-    sloth.update_terminal_stats(pred, time)
+    # sloth.update_terminal_stats(pred, time)
     current_action = np.argmax(pred)
     current_prob = pred[current_action]
     # print(action_names[current_action], current_prob, '----', time)

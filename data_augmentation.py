@@ -117,8 +117,8 @@ def print_action_dict(action_dict):
     for key in action_dict:
         print(key, '---->', len(action_dict[key]))
 
-dataset = np.load('train_data_shape(4704_500_24).npy').astype('float64')
-labels = np.load('train_labels_shape(4704_1).npy')
+dataset = np.load('train_data_shape(4950_500_24).npy').astype('float64')
+labels = np.load('train_labels_shape(4950_1).npy')
 
 print(dataset.shape)
 print('Unique labels:')

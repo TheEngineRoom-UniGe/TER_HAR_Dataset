@@ -9,13 +9,13 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
-TRAIN = True
+TRAIN = False
 USE_IDLE = True
 
 # Treshold to remove outliers with too many samples
 # threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
 threshold_high = 500#3000
-threshold_low = 200#150
+threshold_low = 150#150
 
 def load_set_indexes(path):
     with open(path, 'r') as f:

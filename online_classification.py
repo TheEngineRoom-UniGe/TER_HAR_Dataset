@@ -54,7 +54,7 @@ class OnlineClassification:
         self.latest_sample.fill(np.nan)
         '''initialize the window'''
         self.window = np.zeros((1, self.window_size, self.feature_size))
-
+        self.window.fill(np.nan)
         # '''initialize the subscriber'''
         # self.sub = rospy.Subscriber(in_topic, String, self.callback)
 
@@ -141,23 +141,29 @@ class OnlineClassification:
                 
                 self.latest_sample[0, id : id + 6] = arg_list
 
-                if not np.isnan(self.latest_sample).any() and not np.isnan(self.window).any():
-                    self.window = np.roll(self.window, self.window_size-1, axis=1)
+                if not np.isnan(self.latest_sample).any():# and not np.isnan(self.window).any():
+                    self.window = np.roll(self.window, -1, axis=1)
                     # print(f'{self.latest_sample=}')
                     self.window[0, -1, :] = self.latest_sample
 
-                    scaled_window = self.frequency_analysis(self.window)
-                    scaled_window = self.full_scale_normalize(self.window)
+                    if not np.isnan(self.window).any():
+                        scaled_window = self.frequency_analysis(self.window)
+                        scaled_window = self.full_scale_normalize(scaled_window)
 
-                    scaled_tensor_window = torch.from_numpy(scaled_window).float().cuda()
-                    prediction, time = self.sloth.classify(scaled_tensor_window)
-                    # print(self.window[0, -500, :])
-                    # print(self.window.shape)
-                    # sys.exit()
-                    if self.do_plot:
-                        self.sloth.update_plot(prediction, time)
+                        scaled_tensor_window = torch.from_numpy(scaled_window).float().cuda()
+                        prediction, time = self.sloth.classify(scaled_tensor_window)
+                        # print("=====================================")
+                        # print([f'{s:.2f}' for s in scaled_tensor_window[0, -1, :]][:6])
+                        # print([f'{s:.2f}' for s in scaled_tensor_window[0, -1, :]][6:12])
+                        # print([f'{s:.2f}' for s in scaled_tensor_window[0, -1, :]][12:18])
+                        # print([f'{s:.2f}' for s in scaled_tensor_window[0, -1, :]][18:24])
+                        # print(scaled_tensor_window[0,:,2])
+                        # print(self.window.shape)
+                        # sys.exit()
+                        if self.do_plot:
+                            self.sloth.update_plot(prediction, time)
+                        self.update_terminal_stats(prediction, time)
                     self.latest_sample.fill(np.nan)
-                    self.update_terminal_stats(prediction, time)
         finally:
             self.mutex.release()
         return
@@ -177,6 +183,6 @@ if __name__ == '__main__':
     OC = OnlineClassification(window_size=500, 
                               feature_size=24, 
                               n_actions=5, 
-                              model_uri="best_model_idle.pth",
+                              model_uri="best_model898.pth",
                               do_plot=False)
     OC.listener()

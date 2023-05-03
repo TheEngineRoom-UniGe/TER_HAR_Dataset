@@ -9,13 +9,13 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 from torcheval.metrics import BinaryAccuracy
-from torchsummary import summary
+from torchinfo import summary
 
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
 training = True
 
-balanced_dataset = True
+balanced_dataset = False
 binary_classification = False
 
 current_action = 'ASSEMBLY1'
@@ -59,12 +59,16 @@ def normalize(data):
     return data/maxes
 
 def full_scale_normalize(data):
-    acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
-    gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
+    if data.shape[-1] == 24:
+        acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
+        gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
 
-    # 1g equals 8192. The full range is 2g
-    data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
-    data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 1000.0
+        # 1g equals 8192. The full range is 2g
+        data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
+        data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 500.0
+
+    else: 
+        data = data / 16384.0
 
     return data
 
@@ -133,23 +137,17 @@ print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    train_dataset = np.load('balanced_datasets/train_balanced_data(6345_500_24).npy').astype('float32')
-    train_labels = np.load('balanced_datasets/train_balanced_labels(6345_1).npy', allow_pickle=True)#.astype('int32')
-
-    # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
-    # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
-
-    test_dataset = np.load('test_data_shape(1184_500_24).npy').astype('float32')
-    test_labels = np.load('test_labels_shape(1184_1).npy')
+    train_dataset = np.load('balanced_datasets/train_balanced_data(6750_500_24).npy').astype('float32')
+    train_labels = np.load('balanced_datasets/train_balanced_labels(6750_1).npy', allow_pickle=True)#.astype('int32')
+    test_dataset = np.load('test_data_shape(1233_500_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape(1233_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    train_dataset = np.load('train_data_shape(4704_500_24).npy').astype('float32')
-    # dataset = torch.load('filename')
-    train_labels = np.load('train_labels_shape(4704_1).npy')
-    test_dataset = np.load('test_data_shape(1184_500_24).npy').astype('float32')
-    # dataset = torch.load('filename')
-    test_labels = np.load('test_labels_shape(1184_1).npy')
+    train_dataset = np.load('train_data_shape(4950_500_24).npy').astype('float32')
+    train_labels = np.load('train_labels_shape(4950_1).npy')
+    test_dataset = np.load('test_data_shape(1233_500_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape(1233_1).npy')
 
 unique_labels = np.unique(train_labels)
 print(unique_labels)
@@ -158,8 +156,6 @@ print(unique_labels)
 label_encoder = LabelEncoder()
 train_labels = label_encoder.fit_transform(train_labels.ravel())
 test_labels = label_encoder.fit_transform(test_labels.ravel())
-# if balanced_dataset:
-#     integer_labels = labels.ravel()
 
 
 if binary_classification:
@@ -170,8 +166,10 @@ if binary_classification:
 # if balanced_dataset:
 #     unique_labels = np.unique(integer_labels)
 
+''' Remove Gyroscope Features'''
+# train_dataset = ignore_gyro_features(train_dataset)
+# test_dataset = ignore_gyro_features(test_dataset)
 
-# dataset = ignore_gyro_features(dataset)
 # dataset = add_feature_profiles(dataset)
 # dataset = dataset[:,:,12:16]
 
@@ -195,6 +193,9 @@ print(f'\t{test_dataset.shape=}')
 print(f'\t{train_labels.shape=}')
 print(f'\t{test_labels.shape=}')
 
+# train_dataset = add_feature_profiles(train_dataset)
+# test_dataset = add_feature_profiles(test_dataset)
+
 
 
 print("\n--- Training ---")
@@ -213,7 +214,7 @@ print(f'\t{y.shape=}')
 
 # Define hyperparameters
 input_dim = train_dataset[0].shape[-1]
-hidden_dim = 8
+hidden_dim = 256
 n_layers = 2
 if binary_classification:
     output_dim = 1
@@ -224,7 +225,7 @@ else:
 
 lr = 0.0001
 epochs = 200
-batch_size = 16
+batch_size = 32
 dropout = 0.5
 l2_lambda = 0.00005
 
@@ -254,7 +255,7 @@ else:
     model = CNN_1D_multihead(input_dim, output_dim).cuda()
     # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 # print(f'{model}')
-summary(model, (train_dataset[0].shape[0], train_dataset[0].shape[1]), batch_size, device='cuda')
+summary(model, input_size=(batch_size, train_dataset[0].shape[0], train_dataset[0].shape[1]))
 # exit()
 if binary_classification:
     criterion= nn.BCELoss()

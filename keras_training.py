@@ -9,8 +9,7 @@ import transformer
 import keras
 import tensorflow as tf 
 from keras.callbacks import ModelCheckpoint
-from tensorflow.python.client import device_lib
-
+from keras import layers
 
 
 #from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
@@ -60,6 +59,17 @@ def normalize(data):
     return data/maxes
 
 
+def full_scale_normalize(data):
+    acceleration_idxs = [0,1,2,6,7,8,12,13,14,18,19,20]
+    gyroscope_idxs = [3,4,5,9,10,11,15,16,17,21,22,23]
+
+    # 1g equals 8192. The full range is 2g
+    data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
+    data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 1000.0
+
+    return data
+
+
 def add_feature_profiles(dataset):
     '''Adds the module of the 3D vector of each feature to the dataset'''
     dataset = dataset.reshape(dataset.shape[0], dataset.shape[1], -1, 3)
@@ -68,25 +78,36 @@ def add_feature_profiles(dataset):
     return dataset.reshape(dataset.shape[0], dataset.shape[1], -1)
 
 
-
 print("\n--- Data Loading ---")
 
 if balanced_dataset:
     print("\n--- Loading Balanced Dataset ---")
-    dataset = np.load('balanced_datasets/balanced_data1.npy').astype('float32')
-    # dataset = torch.load('filename')
-    labels = np.load('balanced_datasets/balanced_labels1.npy', allow_pickle=True)#.astype('int32')
+    train_dataset = np.load('balanced_datasets/train_balanced_data(6750_500_24).npy').astype('float32')
+    train_labels = np.load('balanced_datasets/train_balanced_labels(6750_1).npy', allow_pickle=True)#.astype('int32')
+
+    # test_dataset = np.load('balanced_datasets/train_balanced_data.npy').astype('float32')
+    # test_labels = np.load('balanced_datasets/train_balanced_labels.npy', allow_pickle=True)#.astype('int32')
+
+    test_dataset = np.load('test_data_shape(1233_500_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape(1233_1).npy')
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    dataset = np.load('data_shape(2699_2981_24).npy').astype('float32')
+    train_dataset = np.load('train_data_shape(4950_500_24).npy').astype('float32')
     # dataset = torch.load('filename')
-    labels = np.load('labels_shape(2699_1).npy')
+    train_labels = np.load('train_labels_shape(4950_1).npy')
+    test_dataset = np.load('test_data_shape(1233_500_24).npy').astype('float32')
+    # dataset = torch.load('filename')
+    test_labels = np.load('test_labels_shape(1233_1).npy')
 
+
+unique_labels = np.unique(train_labels)
+print(unique_labels)
 
 # Convert string labels to integer labels
 label_encoder = LabelEncoder()
-integer_labels = label_encoder.fit_transform(labels.ravel())
+train_labels = label_encoder.fit_transform(train_labels.ravel())
+test_labels = label_encoder.fit_transform(test_labels.ravel())
 # if balanced_dataset:
 #     integer_labels = labels.ravel()
 
@@ -94,7 +115,7 @@ integer_labels = label_encoder.fit_transform(labels.ravel())
 if binary_classification:
     print("\n--- Reducing to a Binary Classification Problem ---")
     integer_labels = oneVsAll(labels, integer_labels, current_action)
-unique_labels = np.unique(labels)
+
 # if balanced_dataset:
 #     unique_labels = np.unique(integer_labels)
 
@@ -104,16 +125,23 @@ unique_labels = np.unique(labels)
 # dataset = dataset[:,:,12:16]
 
 print("Loaded dataset and labels: ")
-print(f'\t{dataset.shape=}')
-print(f'\t{integer_labels.shape=}')
-print("Most populated class: ", np.argmax(np.bincount(integer_labels)))
+# print(f'\t{dataset.shape=}')
+print('TRAIN')
+# print(f'\t{train_labels.shape=}')
+print("Most populated class: ", unique_labels[np.argmax(np.bincount(test_labels))])
+print('TEST')
+# print(f'\t{test_labels.shape=}')
+print("Most populated class: ", unique_labels[np.argmax(np.bincount(test_labels))])
 
 
-# Split the data into training and test sets
-train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
 
-train_dataset = normalize(train_dataset)
-test_dataset = normalize(test_dataset)  
+train_dataset = full_scale_normalize(train_dataset)
+test_dataset = full_scale_normalize(test_dataset)  
+print("\nSplitted dataset and labels: ")
+print(f'\t{train_dataset.shape=}')
+print(f'\t{test_dataset.shape=}')
+print(f'\t{train_labels.shape=}')
+print(f'\t{test_labels.shape=}')
 
 print("\nSplitted dataset and labels: ")
 print(f'\t{train_dataset.shape=}')
@@ -145,11 +173,16 @@ x_test = test_dataset
 y_test = test_labels
 # x_test = torch.Tensor(test_dataset).to(device)
 # y_test = torch.Tensor(test_labels).squeeze().long().to(device)
-print(f'\t{x.shape=}')
-print(f'\t{y.shape=}')
+print(f'{x.shape=}')
+print(f'{y.shape=}')
+x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
+print(f'{x_train.shape=}')
+print(f'{y_train.shape=}')
+print(f'{x_val.shape=}')
+print(f'{y_val.shape=}')
 
 # Define hyperparameters
-input_dim = dataset[0].shape[-1]
+input_dim = train_dataset[0].shape[-1]
 hidden_dim = 8
 n_layers = 2
 if binary_classification:
@@ -159,9 +192,9 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0005
+lr = 0.00005
 epochs = 200
-batch_size = 8
+batch_size = 32
 dropout = 0.5
 l2_lambda = 0.0001
 
@@ -190,7 +223,7 @@ model = transformer.build_model(
     num_heads=4,
     ff_dim=4,
     num_transformer_blocks=4,
-    mlp_units=[128],
+    mlp_units=[128,64],
     mlp_dropout=0.4,
     dropout=0.2,
     n_classes=unique_labels.shape[0]
@@ -198,37 +231,35 @@ model = transformer.build_model(
 
 model.compile(
     loss="sparse_categorical_crossentropy",
-    optimizer=keras.optimizers.Adam(learning_rate=1e-3),
+    optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
     metrics=["sparse_categorical_accuracy"],
 )
 model.summary()
 callbacks = [keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True), 
              ModelCheckpoint('transformer.h5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')]
 
-model.fit(
-    x,
-    y,
-    validation_split=0.2,
-    epochs=200,
-    batch_size=16,
-    callbacks=callbacks,
-)
+if training:
+    model.fit(
+        x_train,
+        y_train,
+        batch_size=batch_size,
+        epochs=epochs,
+        validation_data=(x_val, y_val),
+        callbacks=callbacks,
+    )
+
+else: 
+    model = keras.models.load_model('transformer.h5')
 
 model.evaluate(x_test, y_test, verbose=1)
+y_pred = model.predict(x_test)
 
 if binary_classification:
-    model.load_state_dict(keras.load(f"binary_models/{current_action}.pth"))
+    metric = BinaryAccuracy(device=torch.device('cuda'))
+    metric.update(y_pred.squeeze().cuda(), y_test.cuda())
+    acc = metric.compute()
 else:
-    model.load_state_dict(keras.load("transformer.h5"))
-model.eval()
-x_test = x_test
-y_pred = model(x_test)  
-# if binary_classification:
-    # metric = BinaryAccuracy(device=torch.device('cuda'))
-    # metric.update(y_pred.squeeze().cuda(), y_test.cuda())
-    # acc = metric.compute()
-# else:
-acc = get_accuracy(y_pred, y_test)
+    acc = get_accuracy(y_pred, y_test)
 print("accuracy: ", acc)
 
 
