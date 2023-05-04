@@ -1,5 +1,6 @@
 import rospy
 from std_msgs.msg import String
+from sensor_msgs.msg import Imu
 import numpy as np
 import torch
 from models import CNN_1D_multihead
@@ -68,6 +69,16 @@ class OnlineClassification:
         return [float(x) for x in arg_list[:-1]], arg_list[-1]
 
 
+    def unpack_imu_msg(self, msg):
+        data = []
+        data.append(msg.linear_acceleration.x)
+        data.append(msg.linear_acceleration.y)
+        data.append(msg.linear_acceleration.z)
+        data.append(msg.angular_velocity.x)
+        data.append(msg.angular_velocity.y)
+        data.append(msg.angular_velocity.z)
+        return data, msg.header.frame_id
+
     def low_pass(self, sequence, freq):
         '''UNCOMMENT TO PLOT THE ORIGINAL VS THE FILTERED VERSION'''
         # fig = plt.figure()
@@ -100,7 +111,7 @@ class OnlineClassification:
 
         # 1g equals 8192. The full range is 2g
         tmp[:,:,acceleration_idxs] = tmp[:,:,acceleration_idxs] / 16384.0
-        tmp[:,:,gyroscope_idxs] = tmp[:,:,gyroscope_idxs] / 1000.0
+        tmp[:,:,gyroscope_idxs] = tmp[:,:,gyroscope_idxs] / 100.0
         return tmp
 
 
@@ -130,7 +141,7 @@ class OnlineClassification:
         self.mutex.acquire()
 
         try:
-            arg_list, sensor_name = self.try_unpack_msg(data.data)
+            arg_list, sensor_name = self.unpack_imu_msg(data)
             if arg_list is not None and sensor_name is not None:
                 # print(f'{sensor_name=}')
                 # print(f'{arg_list=}')
@@ -144,7 +155,7 @@ class OnlineClassification:
                 if not np.isnan(self.latest_sample).any():# and not np.isnan(self.window).any():
                     self.window = np.roll(self.window, -1, axis=1)
                     # print(f'{self.latest_sample=}')
-                    self.window[0, -1, :] = self.latest_sample
+                    self.window[0, -1, :] = self.latest_sample.copy()
 
                     if not np.isnan(self.window).any():
                         scaled_window = self.frequency_analysis(self.window)
@@ -175,7 +186,7 @@ class OnlineClassification:
 
     def listener(self):
         rospy.init_node('online_classification', anonymous=True)
-        rospy.Subscriber(in_topic, String, self.callback)
+        rospy.Subscriber(in_topic, Imu, self.callback)
         rospy.spin()
 
 
@@ -183,6 +194,6 @@ if __name__ == '__main__':
     OC = OnlineClassification(window_size=500, 
                               feature_size=24, 
                               n_actions=5, 
-                              model_uri="best_model898.pth",
+                              model_uri="best_model905.pth",
                               do_plot=False)
     OC.listener()

@@ -9,12 +9,12 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
-TRAIN = False
+TRAIN = True
 USE_IDLE = True
 
 # Treshold to remove outliers with too many samples
 # threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
-threshold_high = 500#3000
+threshold_high = 3000#3000
 threshold_low = 150#150
 
 def load_set_indexes(path):
@@ -423,9 +423,9 @@ def main():
 
     print('Number of sequences: ', len(action_list_np))
     print('Number of labels: ', len(labels_list))
-    action_list_np, labels_list, len_list = window_augmenter(action_list_np, labels_list, threshold_high, threshold_low)
-    print('Number of sequences: ', len(action_list_np))
-    print('Number of labels: ', len(labels_list))
+    # action_list_np, labels_list, len_list = window_augmenter(action_list_np, labels_list, threshold_high, threshold_low)
+    # print('Number of sequences: ', len(action_list_np))
+    # print('Number of labels: ', len(labels_list))
 
     mask_np_high = len_list <= threshold_high
     mask_np_low = len_list >= threshold_low
