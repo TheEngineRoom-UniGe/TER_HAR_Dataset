@@ -16,7 +16,7 @@ FREQ = 25
 plot_sequence_labels = False 
 
 full_sequences_path = 'full_sequences'
-subj_dir = 's01'
+subj_dir = 's05'
 window_size = 500
 network_size = 500
 stride = 1
@@ -30,7 +30,7 @@ thresholds     = {0: 0.98804504,    1: 0.9947729,  2: 0.99488586,  3: 0.97964764
 
 gamma = 1
 theta = 0.8
-Rho = 0.08
+Rho = 0.05
 Tau = [gamma * value for value in [0.98804504, 0.9947729, 0.99488586, 0.97964764, 0.9955418]]
 C = [ window_size/2 for i in range(5)]
 # C = [theta * value for value in [742.6095076400679, 1180.1586021505377, 1012.3956989247312, 323.61538461538464, 1106.9691943127962]]
@@ -167,7 +167,7 @@ print(f'{output_dim=}')
 print(f'{input_dim=}')
 
 model = CNN_1D_multihead(input_dim, output_dim).cuda()
-model.load_state_dict(torch.load("best_model_idle_ols.pth"))
+model.load_state_dict(torch.load("best_model908.pth"))
 # summary(model, (window_size, input_dim), 1, device='cuda')
 model.eval()
 
@@ -209,14 +209,14 @@ while window_idx < synchronized_sequences.shape[0]:
     # print(window_tensor.shape)
     # print(window_tensor[0, -3:, :3])
     pred, time = sloth.classify(window_tensor)
-    print("=====================================")
-    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][:6])
-    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][6:12])
-    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][12:18])
-    print([f'{s:.2f}' for s in window_tensor[0, -1, :]][18:24])
+    # print("=====================================")
+    # print([f'{s:.2f}' for s in window_tensor[0, -1, :]][:6])
+    # print([f'{s:.2f}' for s in window_tensor[0, -1, :]][6:12])
+    # print([f'{s:.2f}' for s in window_tensor[0, -1, :]][12:18])
+    # print([f'{s:.2f}' for s in window_tensor[0, -1, :]][18:24])
 
     # sloth.update_plot(pred, time)
-    # sloth.update_terminal_stats(pred, time)
+    sloth.update_terminal_stats(pred, time)
     current_action = np.argmax(pred)
     current_prob = pred[current_action]
     # print(action_names[current_action], current_prob, '----', time)

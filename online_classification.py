@@ -151,17 +151,18 @@ class OnlineClassification:
                 # print(f'{self.latest_sample.shape=}')
                 
                 self.latest_sample[0, id : id + 6] = arg_list
-
+                
                 if not np.isnan(self.latest_sample).any():# and not np.isnan(self.window).any():
                     self.window = np.roll(self.window, -1, axis=1)
                     # print(f'{self.latest_sample=}')
                     self.window[0, -1, :] = self.latest_sample.copy()
 
                     if not np.isnan(self.window).any():
-                        scaled_window = self.frequency_analysis(self.window)
-                        scaled_window = self.full_scale_normalize(scaled_window)
-
-                        scaled_tensor_window = torch.from_numpy(scaled_window).float().cuda()
+                        # scaled_window = self.frequency_analysis(self.window)
+                        scaled_window = self.full_scale_normalize(self.window)
+                        padded_window = np.zeros((1, 500, 24))
+                        padded_window[0, 500-scaled_window.shape[1]:, :] = scaled_window[0, :, :]
+                        scaled_tensor_window = torch.from_numpy(padded_window).float().cuda()
                         prediction, time = self.sloth.classify(scaled_tensor_window)
                         # print("=====================================")
                         # print([f'{s:.2f}' for s in scaled_tensor_window[0, -1, :]][:6])
@@ -191,9 +192,24 @@ class OnlineClassification:
 
 
 if __name__ == '__main__':
-    OC = OnlineClassification(window_size=500, 
+    OC = OnlineClassification(window_size=300, 
                               feature_size=24, 
                               n_actions=5, 
-                              model_uri="best_model905.pth",
+                              model_uri="best_model908.pth",
                               do_plot=False)
     OC.listener()
+
+    # space = [x for x in range(100)]
+    # data = np.zeros((1,100,12))
+    # for i in range(12):
+    #     data[:, :, i] = space
+    # print(data)
+    # data = np.roll(data, -1, axis=1)
+    # data[0, -1, :] = 100
+    # print(data)
+    # data = np.roll(data, -1, axis=1)
+    # data[0, -1, :] = 101
+    # print(data)
+    # data = np.roll(data, -1, axis=1)
+    # data[0, -1, :] = 102
+    # print(data)
