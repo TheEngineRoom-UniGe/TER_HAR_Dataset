@@ -144,10 +144,10 @@ if balanced_dataset:
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    train_dataset = np.load('train_data_shape(2144_3000_24).npy').astype('float32')
-    train_labels = np.load('train_labels_shape(2144_1).npy')
-    test_dataset = np.load('test_data_shape(546_3000_24).npy').astype('float32')
-    test_labels = np.load('test_labels_shape(546_1).npy')
+    train_dataset = np.load('train_data_shape(8940_250_24).npy').astype('float32')
+    train_labels = np.load('train_labels_shape(8940_1).npy')
+    test_dataset = np.load('test_data_shape(2251_250_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape(2251_1).npy')
 
 unique_labels = np.unique(train_labels)
 print(unique_labels)
@@ -223,9 +223,9 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0002
+lr = 0.0001
 epochs = 200
-batch_size = 4
+batch_size = 32
 dropout = 0.5
 l2_lambda = 0.00005
 

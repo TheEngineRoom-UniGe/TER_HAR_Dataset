@@ -24,12 +24,12 @@ class OnlineClassification:
         self.mutex = Lock()
 
         '''initialize SLOTH parameters'''
-        gamma = 1
+        gamma = 0.9
         theta = 0.8
-        Rho = 0.08
+        Rho = 0.05
         Tau = [gamma * value for value in [0.98804504, 0.9947729, 0.99488586, 0.97964764, 0.9955418]]
         C = [theta * value for value in [742.6095076400679, 1180.1586021505377, 1012.3956989247312, 323.61538461538464, 1106.9691943127962]]
-        C = [ window_size/2 for i in range(5)]
+        C = [120, 150, 150, 80, 150]
 
         action_colors   = {0: 'red',            1: 'green',              2: 'blue',          3: 'pink',           4: 'yellow', -1: 'white'}
         action_names    = {0: 'ASSEMBLY',            1: 'BOLT',              2: 'IDLE',          3: 'PICKUP',           4: 'SCREW'}
@@ -174,7 +174,8 @@ class OnlineClassification:
                         # sys.exit()
                         if self.do_plot:
                             self.sloth.update_plot(prediction, time)
-                        self.update_terminal_stats(prediction, time)
+                        # self.update_terminal_stats(prediction, time)
+                        self.sloth.detect()
                     self.latest_sample.fill(np.nan)
         finally:
             self.mutex.release()
