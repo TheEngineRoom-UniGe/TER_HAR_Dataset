@@ -38,6 +38,13 @@ def ignore_gyro_features(dataset):
     return dataset
 
 
+def to_incremental(dataset):
+    '''Converts the dataset to incremental by adding the previous sample to the current one'''
+    dataset = np.diff(dataset, axis=1)
+    dataset = np.concatenate((dataset[:,0:1,:], dataset), axis=1)
+    return dataset
+
+
 
 def get_accuracy(pred, test):
     '''Returns the accuracy of the model on the multiclass problem'''
@@ -54,9 +61,9 @@ def normalize(data):
     '''Normalizes the data by dividing each feature by its maximum value'''
     maxes = np.amax(data, axis=(0,1))
     print(maxes)
-    # mins = np.amin(data, axis=(0,1))
-    # return (2*(data-mins)/(maxes-mins))-1
-    return data/maxes
+    mins = np.amin(data, axis=(0,1))
+    return ((data-mins)/(maxes-mins))-1
+    # return data/maxes
 
 def full_scale_normalize(data):
     if data.shape[-1] == 24:
@@ -144,10 +151,10 @@ if balanced_dataset:
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    train_dataset = np.load('train_data_shape(8940_250_24).npy').astype('float32')
-    train_labels = np.load('train_labels_shape(8940_1).npy')
-    test_dataset = np.load('test_data_shape(2251_250_24).npy').astype('float32')
-    test_labels = np.load('test_labels_shape(2251_1).npy')
+    train_dataset = np.load('train_data_shape_nopickup(1949_3000_24).npy').astype('float32')
+    train_labels = np.load('train_labels_shape_nopickup(1949_1).npy')
+    test_dataset = np.load('test_data_shape_nopickup(501_3000_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape_nopickup(501_1).npy')
 
 unique_labels = np.unique(train_labels)
 print(unique_labels)
@@ -184,6 +191,12 @@ print("Most populated class: ", unique_labels[np.argmax(np.bincount(test_labels)
 
 # Split the data into training and test sets
 # train_dataset, test_dataset, train_labels, test_labels = train_test_split(dataset, integer_labels, test_size=0.2, random_state=42)
+
+
+# train_dataset = to_incremental(train_dataset)
+# test_dataset = to_incremental(test_dataset)  
+# train_dataset = normalize(train_dataset)
+# test_dataset = normalize(test_dataset) 
 
 train_dataset = full_scale_normalize(train_dataset)
 test_dataset = full_scale_normalize(test_dataset)  
@@ -223,9 +236,9 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0001
+lr = 0.0002
 epochs = 200
-batch_size = 32
+batch_size = 4
 dropout = 0.5
 l2_lambda = 0.00005
 

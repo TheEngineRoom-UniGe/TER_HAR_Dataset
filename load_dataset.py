@@ -9,13 +9,13 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
-TRAIN = True
+TRAIN = False
 USE_IDLE = True
 
 # Treshold to remove outliers with too many samples
 # threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
-threshold_high = 250#3000
-threshold_low = 120#150
+threshold_high = 3000#250#3000
+threshold_low = 120#120#150
 
 def load_set_indexes(path):
     with open(path, 'r') as f:
@@ -46,8 +46,11 @@ def remap_categories(labels, dataset):
             base_action = 'ASSEMBLY'
         
         '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
-        if 'HANDOVER' in base_action or 'DELIVERY' in base_action or 'PICKUP' in base_action:
-            base_action = 'PICKUP'
+        if 'HANDOVER' in base_action or 'DELIVERY' in base_action: #or 'PICKUP' in base_action:
+            base_action = 'DELIVERY'
+
+        if 'PICKUP' in base_action:
+            continue
 
         # '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
         # if 'PICKUP' in base_action or 'DELIVERY' in base_action:
@@ -485,7 +488,6 @@ def main():
     plt.boxplot(len_x_action.values(), labels=len_x_action.keys())
     plt.xticks(rotation=45)
     plt.show()
-
     fig, axs = plt.subplots(len(len_x_action.keys()))
     for i in range(len(len_x_action.keys())):
 
@@ -500,6 +502,7 @@ def main():
     print('Number of sequences: ', len(action_list_np))
     print('Number of labels: ', len(labels_list))
 
+    # exit()
     
     tensor_list = [torch.tensor(arr) for arr in masked_list]
     tensor = pad_sequence(tensor_list, batch_first=True)

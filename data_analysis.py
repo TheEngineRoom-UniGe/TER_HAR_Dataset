@@ -3,7 +3,7 @@ import numpy as np
 import plotly.express as px
 import pandas as pd
 
-set = 'training'
+set = 'all'
 set_dir = []
 full_sequences_path = 'full_sequences'
 

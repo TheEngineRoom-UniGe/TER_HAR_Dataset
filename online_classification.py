@@ -174,8 +174,8 @@ class OnlineClassification:
                         # sys.exit()
                         if self.do_plot:
                             self.sloth.update_plot(prediction, time)
-                        # self.update_terminal_stats(prediction, time)
-                        self.sloth.detect()
+                        self.update_terminal_stats(prediction, time)
+                        # self.sloth.detect()
                     self.latest_sample.fill(np.nan)
         finally:
             self.mutex.release()
