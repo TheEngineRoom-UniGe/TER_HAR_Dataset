@@ -10,13 +10,13 @@ import keras
 import tensorflow as tf 
 from keras.callbacks import ModelCheckpoint
 from keras import layers
-
-
+from HART import HART, mobileHART_XS, mobileHART_XXS
+from transformer2 import Transformer
 #from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
 training = True
 
-balanced_dataset = True
+balanced_dataset = False
 binary_classification = False
 
 current_action = 'ASSEMBLY1'
@@ -65,7 +65,7 @@ def full_scale_normalize(data):
 
     # 1g equals 8192. The full range is 2g
     data[:,:,acceleration_idxs] = data[:,:,acceleration_idxs] / 16384.0
-    data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 1000.0
+    data[:,:,gyroscope_idxs] = data[:,:,gyroscope_idxs] / 100.0
 
     return data
 
@@ -78,6 +78,9 @@ def add_feature_profiles(dataset):
     return dataset.reshape(dataset.shape[0], dataset.shape[1], -1)
 
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 print("\n--- Data Loading ---")
 
 if balanced_dataset:
@@ -110,6 +113,8 @@ train_labels = label_encoder.fit_transform(train_labels.ravel())
 test_labels = label_encoder.fit_transform(test_labels.ravel())
 # if balanced_dataset:
 #     integer_labels = labels.ravel()
+
+
 
 
 if binary_classification:
@@ -181,6 +186,8 @@ print(f'{y_train.shape=}')
 print(f'{x_val.shape=}')
 print(f'{y_val.shape=}')
 
+
+
 # Define hyperparameters
 input_dim = train_dataset[0].shape[-1]
 hidden_dim = 8
@@ -192,7 +199,7 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.00005
+lr = 0.0001
 epochs = 200
 batch_size = 32
 dropout = 0.5
@@ -216,18 +223,22 @@ print(f'\t{l2_lambda=}\n')
 print(f'\t{patience=}\n')
 
 input_shape = x.shape[1:]
+print(f'{input_shape=}')
 print(f'{unique_labels.shape[0]=}')
-model = transformer.build_model(
-    input_shape,
-    head_size=256,
-    num_heads=4,
-    ff_dim=4,
-    num_transformer_blocks=4,
-    mlp_units=[128,64],
-    mlp_dropout=0.4,
-    dropout=0.2,
-    n_classes=unique_labels.shape[0]
-)
+# model = transformer.build_model(
+#     input_shape,
+#     head_size=256,
+#     num_heads=4,
+#     ff_dim=4,
+#     num_transformer_blocks=4,
+#     mlp_units=[128,64],
+#     mlp_dropout=0.4,
+#     dropout=0.2,
+#     n_classes=unique_labels.shape[0]
+# )
+
+# model = HART(input_shape, unique_labels.shape[0], dropout_rate=dropout, num_heads=6)
+model = mobileHART_XS(input_shape, unique_labels.shape[0], dropout_rate=dropout)
 
 model.compile(
     loss="sparse_categorical_crossentropy",

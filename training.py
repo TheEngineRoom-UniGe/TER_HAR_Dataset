@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from torcheval.metrics import BinaryAccuracy
 from torchinfo import summary
-
+from transformer2 import IMUCLSBaseline, IMUTransformerEncoder
 from models import LSTMMultiClass, TransformerClassifier, LSTMBinary, CNN_1D, CNN_1D_multihead
 
 training = True
@@ -151,10 +151,10 @@ if balanced_dataset:
 
 else:
     print("\n--- Loading Unbalanced Dataset ---")
-    train_dataset = np.load('train_data_shape_nopickup(1949_3000_24).npy').astype('float32')
-    train_labels = np.load('train_labels_shape_nopickup(1949_1).npy')
-    test_dataset = np.load('test_data_shape_nopickup(501_3000_24).npy').astype('float32')
-    test_labels = np.load('test_labels_shape_nopickup(501_1).npy')
+    train_dataset = np.load('train_data_shape_noassembly(4105_500_24).npy').astype('float32')
+    train_labels = np.load('train_labels_shape_noassembly(4105_1).npy')
+    test_dataset = np.load('test_data_shape_noassembly(1028_500_24).npy').astype('float32')
+    test_labels = np.load('test_labels_shape_noassembly(1028_1).npy')
 
 unique_labels = np.unique(train_labels)
 print(unique_labels)
@@ -236,9 +236,9 @@ else:
 '''multihead cnn works best with 0.0005'''
 '''singlehead cnn works best with 0.0001'''
 
-lr = 0.0002
+lr = 0.00005
 epochs = 200
-batch_size = 4
+batch_size = 16
 dropout = 0.5
 l2_lambda = 0.00005
 
@@ -265,7 +265,9 @@ if binary_classification:
 else:
     # model = LSTMMultiClass(input_dim, hidden_dim, output_dim, n_layers, dropout).cuda()
     # model = CNN_1D(input_dim, output_dim, dropout).cuda()
-    model = CNN_1D_multihead(input_dim, output_dim).cuda()
+    # model = CNN_1D_multihead(input_dim, output_dim).cuda()
+    # model = IMUCLSBaseline(train_dataset[0].shape, output_dim, dropout_prob=dropout).cuda()
+    model = IMUTransformerEncoder(train_dataset[0].shape, output_dim, dropout=dropout).cuda()
     # model = TransformerClassifier(input_dim, output_dim, hidden_dim, n_layers, nheads).cuda()
 # print(f'{model}')
 summary(model, input_size=(batch_size, train_dataset[0].shape[0], train_dataset[0].shape[1]))

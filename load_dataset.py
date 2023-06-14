@@ -9,13 +9,13 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 IMU_FREQ = 25 #HZ
-TRAIN = False
+TRAIN = True
 USE_IDLE = True
 
 # Treshold to remove outliers with too many samples
 # threshold = np.mean(len_list)+1*np.std(len_list)        #2*np.std(len_list)
-threshold_high = 3000#250#3000
-threshold_low = 120#120#150
+threshold_high = 500#250#3000
+threshold_low = 100#120#150
 
 def load_set_indexes(path):
     with open(path, 'r') as f:
@@ -43,14 +43,15 @@ def remap_categories(labels, dataset):
         
         '''UNCOMMENT THIS TO JOIN ASSEMBLY 1 AND 2'''
         if 'ASSEMBLY' in base_action:
+            continue
             base_action = 'ASSEMBLY'
         
         '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
         if 'HANDOVER' in base_action or 'DELIVERY' in base_action: #or 'PICKUP' in base_action:
             base_action = 'DELIVERY'
 
-        if 'PICKUP' in base_action:
-            continue
+        # if 'PICKUP' in base_action:
+        #     continue
 
         # '''UNCOMMENT THIS TO JOIN HANDOVER DELIVERY AND PICKUP'''
         # if 'PICKUP' in base_action or 'DELIVERY' in base_action:
